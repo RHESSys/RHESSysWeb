@@ -43,7 +43,9 @@ import gzip
 from unittest import TestCase
 
 from rhessysweb.readflowtable import readFlowtable
+from rhessysweb.readflowtable import getReceiversForFlowtableEntry
 from rhessysweb.types import getFQPatchIDFromArray
+
 
 ## Constants
 ZERO = 0.001
@@ -95,4 +97,22 @@ class TestReadFlowtable(TestCase):
         self.assertTrue( items[1].patchID == 365709 )
         self.assertTrue( abs(items[7].gamma - 0.18454391) < ZERO )
         self.assertTrue( abs(items[8].roadWidth - 5.0) < ZERO )
+    
+    def testGetReceiversForFlowtableEntryWithoutRoad(self):
+        testKeyStr = "328469    145    145"
+        values = testKeyStr.split()
+        testEntry = getFQPatchIDFromArray(values)
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        self.assertTrue( len(receivers) == 8 )
+        self.assertTrue( receivers[0].patchID == 327622 )
+        self.assertTrue( abs(receivers[7].gamma - 0.27929801) < ZERO )
+        
+    def testGetReceiversForFlowtableEntryWithRoad(self):
+        testKeyStr = "366555    145    145"
+        values = testKeyStr.split()
+        testEntry = getFQPatchIDFromArray(values)
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        self.assertTrue( len(receivers) == 7 )
+        self.assertTrue( receivers[0].patchID == 365709 )
+        self.assertTrue( abs(receivers[6].gamma - 0.18454391) < ZERO )
 
