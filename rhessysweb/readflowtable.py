@@ -104,7 +104,7 @@ def getFlowTableEntryRoadFromArray(values):
 ## Function definitions
 def readFlowtable(flowtable):
     """ @brief Read a RHESSys flow table into a dict where the keys are 
-        instances of FlowTableEntry and the values lists containing one or more
+        instances of rhessysweb.types.FQPatchID and the values lists containing one or more
         FlowTableEntryReceiver objects followed by possibly one 
         FlowTableEntryRoad object.
     
@@ -159,7 +159,21 @@ def readFlowtable(flowtable):
     flow.close()   
     return flowDict
 
+def getReceiversForFlowtableEntry(key, flowtable):    
+    """ @brief Get list of receivers for a given flow table key
     
-        
+        @param key rhessysweb.types.FQPatchID
+        @param flowtable Dict returned by readFlowtable
+    
+        @return List of FlowTableEntryReceiver objects
+    """
+    recvs = list()
+    
+    items = flowtable[key]
+    for item in items:
+        if isinstance(item, FlowTableEntryReceiver):
+            recvs.append(item)
+    
+    return recvs
 
 
