@@ -43,7 +43,7 @@ import gzip
 from unittest import TestCase
 
 from rhessysweb.readflowtable import readFlowtable
-from rhessysweb.readflowtable import getFlowTableKeyFromArray
+from rhessysweb.types import getFQPatchIDFromArray
 
 ## Constants
 ZERO = 0.001
@@ -78,7 +78,7 @@ class TestReadFlowtable(TestCase):
     def testEntryWithoutRoad(self):
         testKeyStr = "328469    145    145"
         values = testKeyStr.split()
-        testEntry = getFlowTableKeyFromArray(values)
+        testEntry = getFQPatchIDFromArray(values)
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 9 )
         self.assertTrue( items[0].patchID == 328469)
@@ -88,7 +88,7 @@ class TestReadFlowtable(TestCase):
     def testEntryWithRoad(self):
         testKeyStr = "366555    145    145"
         values = testKeyStr.split()
-        testEntry = getFlowTableKeyFromArray(values)
+        testEntry = getFQPatchIDFromArray(values)
         items = self.flowtable[testEntry]
         self.assertTrue( len(items) == 9)
         self.assertTrue( items[0].patchID == 366555)

@@ -46,25 +46,14 @@ import os, sys, errno
 from collections import namedtuple
 import argparse
 
+import rhessysweb.types
+
 ## Constants
 LAND_TYPE_ROAD = 2
 FLOW_ENTRY_NUM_TOKENS = 11
-FLOW_KEY_NUM_TOKENS = 3
 FLOW_ENTRY_ITEM_NUM_TOKENS = 4
 
 ## Type definitions
-FlowTableKey = namedtuple('FlowTableKey', ['patchID', 'zoneID', 'hillID'], verbose=False)
-
-def getFlowTableKeyFromArray(values):
-    """ @brief Build a FlowTableKey from an array
-        @param values Array of strings representing tokenized flow table key
-        @return FlowTableKey representing the flow table identifiers
-    """
-    assert( len(values) == FLOW_KEY_NUM_TOKENS )
-    return FlowTableKey(patchID=int(values[0]), \
-                          zoneID=int(values[1]), \
-                          hillID=int(values[2]))
-
 FlowTableEntry = namedtuple('FlowTableEntry', ['patchID', 'zoneID', 'hillID', 'x', 'y', 'z', 'accumArea', 'area', 'landType', 'totalGamma', 'numAdjacent'], verbose=False)
 
 def getFlowTableEntryFromArray(values):
@@ -147,14 +136,12 @@ def readFlowtable(flowtable):
 
             # FlowDict uses a FlowTableKey as reference, adds newEntry and items as entries
             newEntry = getFlowTableEntryFromArray(values)
-            newKey = FlowTableKey(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
-            #flowDict[newEntry] = list()
+            newKey = rhessysweb.types.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
             flowDict[newKey] = list()
             flowDict[newKey].append(newEntry)
             readReceivers = True
             numRead = 0
             numAdj = int(newEntry.numAdjacent)
-            #currEntry = newEntry
             currEntry = newKey
         elif len(values) == FLOW_ENTRY_ITEM_NUM_TOKENS and readReceivers:
             # Check for error in flow table structure

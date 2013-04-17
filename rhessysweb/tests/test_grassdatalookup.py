@@ -45,8 +45,13 @@ from shutil import rmtree
 from zipfile import ZipFile
 from unittest import TestCase
 
+import rhessysweb.types
 from rhessysweb.grassdatalookup import getFQPatchIDForCoordinates
+from rhessysweb.grassdatalookup import getCoordinatesForFQPatchIDs
 from rhessysweb.grassdatalookup import GRASSConfig
+
+## Constants
+ZERO = 3
 
 ## Unit tests
 class TestGRASSDataLookup(TestCase):
@@ -69,23 +74,33 @@ class TestGRASSDataLookup(TestCase):
         gisbase = os.environ['GISBASE']
         self.grassMapset = GRASSConfig(gisbase=gisbase, dbase=self.grassDBasePath, location='DR5', mapset='taehee')
         
+        self.inPatchID = 288804
+        self.inZoneID = 145
+        self.inHillID = 145
+        self.easting = 349100.0
+        self.northing = 4350470.0
+        self.patchMap = "patch_5m"
+        self.zoneMap = "hillslope"
+        self.hillslopeMap = "hillslope"
     
     def tearDown(self):
         rmtree(self.grassDBasePath)
+   
+   
+    def testGetCoordindateForFQPatchIDs(self):
+        fqPatchIDs = [ (rhessysweb.types.FQPatchID(patchID=self.inPatchID, \
+                                                   zoneID=self.inZoneID, hillID=self.inHillID)) ]
+        coords = getCoordinatesForFQPatchIDs(fqPatchIDs, self.grassMapset, self.patchMap, self.zoneMap, self.hillslopeMap)
+        self.assertTrue( len(coords) == 1 )
+        coordPair = coords[0]
+        self.assertTrue( abs(coordPair.easting - self.easting) < ZERO )
+        self.assertTrue( abs(coordPair.northing - self.northing) < ZERO )
     
     def testGetFQPatchIDForCoordinates(self):
-        easting = 349100.0
-        northing = 4350470.0
-        inPatchID = 288804
-        inZoneID = 145
-        inHillID = 145
-        patchMap = "patch_5m"
-        zoneMap = "hillslope"
-        hillslopeMap = "hillslope"
-        
         (patchID, zoneID, hillID) = \
-            getFQPatchIDForCoordinates(easting, northing, self.grassMapset, patchMap, zoneMap, hillslopeMap)
-        self.assertTrue( inPatchID == patchID )
-        self.assertTrue( inZoneID == zoneID )
-        self.assertTrue( inHillID == hillID )
+            getFQPatchIDForCoordinates(self.easting, self.northing, self.grassMapset, \
+                                       self.patchMap, self.zoneMap, self.hillslopeMap)
+        self.assertTrue( self.inPatchID == patchID )
+        self.assertTrue( self.inZoneID == zoneID )
+        self.assertTrue( self.inHillID == hillID )
         
