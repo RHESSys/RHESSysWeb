@@ -37,6 +37,8 @@ Usage:
 @code
 python -m unittest test_grassdatalookup
 @endcode
+
+@note Must have GRASS installed and have GISBASE environmental variable set.
 """ 
 import os, errno
 from shutil import rmtree
@@ -44,7 +46,7 @@ from zipfile import ZipFile
 from unittest import TestCase
 
 from rhessysweb.grassdatalookup import getFQPatchIDForCoordinates
-from rhessysweb.grassdatalookup import GRASSMapset
+from rhessysweb.grassdatalookup import GRASSConfig
 
 ## Unit tests
 class TestGRASSDataLookup(TestCase):
@@ -61,18 +63,20 @@ class TestGRASSDataLookup(TestCase):
             raise IOError(errno.EACCES, "Unable to write to GRASS data parent dir %s" %
                           grassDBaseDir)
         zip = ZipFile(grassDBaseZip, 'r')
-        zip.extractall(path=self.grassDBasePath)
+        extractDir = os.path.split(self.grassDBasePath)[0]
+        zip.extractall(path=extractDir)
         
-        self.grassMapset = GRASSMapset(dbase=self.grassDBasePath, location='DR5', mapset='taehee')
+        gisbase = os.environ['GISBASE']
+        self.grassMapset = GRASSConfig(gisbase=gisbase, dbase=self.grassDBasePath, location='DR5', mapset='taehee')
         
     
     def tearDown(self):
         rmtree(self.grassDBasePath)
     
     def testGetFQPatchIDForCoordinates(self):
-        easting = 349100.7480315
-        northing = 4350470.00787402
-        inPatchID = 289650
+        easting = 349100.0
+        northing = 4350470.0
+        inPatchID = 288804
         inZoneID = 145
         inHillID = 145
         patchMap = "patch_5m"

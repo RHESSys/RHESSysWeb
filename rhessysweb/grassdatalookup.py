@@ -33,18 +33,49 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 @author Brian Miles <brian_miles@unc.edu>
 """
+import os, sys
+import tempfile
 from collections import namedtuple
+from ctypes import *
 
-GRASSMapset = namedtuple('GRASSMapset', ['dbase', 'location', 'mapset'], verbose=False)
+GRASSConfig = namedtuple('GRASSConfig', ['gisbase', 'dbase', 'location', 'mapset'], verbose=False)
 
-def getFQPatchIDForCoordinates(easting, northing, grassMapset, patchMap, zoneMap, hillslopeMap):
+def _initializeGrassrc(grassConfig):
+    grassRcFile = tempfile.NamedTemporaryFile(prefix='grassrc-', delete=False)
+    grassRcContent = "GISDBASE: %s\nLOCATION_NAME: %s\nMAPSET: %s\n" % \
+        (grassConfig.dbase, grassConfig.location, grassConfig.mapset)
+    grassRcFile.write(grassRcContent)
+    return grassRcFile.name
+
+def _getValueForCell(input, row, col):
+    from grass.lib import gis as grass
+    mapset = grass.G_find_cell2(input, '')
+    mapset = c_char_p(mapset).value
+    data_type = grass.G_raster_map_type(input, mapset)
+    if data_type == 0: 
+        ptype = POINTER(c_int) 
+    elif data_type == 1: 
+        ptype = POINTER(c_float) 
+    elif data_type == 2: 
+        ptype = POINTER(c_double) 
+    infd = grass.G_open_cell_old(input, mapset) 
+    inrast = grass.G_allocate_raster_buf(data_type)     
+    inrast = cast(c_void_p(inrast), ptype) 
+    grass.G_get_raster_row(infd, inrast, row, data_type)
+    value = inrast[col]
+    grass.G_close_cell(infd)
+    grass.G_free(inrast)
+    
+    return value
+
+def getFQPatchIDForCoordinates(easting, northing, grassConfig, patchMap, zoneMap, hillslopeMap):
     """ @brief Get the fully qualified ID of the patch located at a coordinate pair.
         The fully qualified patch ID is the combination of the patchID, zoneID,
         and hillslopeID.
     
         @param easting Float represting the easting coordinate
         @param northing Float representing the northing coordinate
-        @param grassMapset GRASSMapset specifying the GRASS mapset that contains 
+        @param grassConfig GRASSConfig specifying the GRASS mapset that contains 
         the patch, zone, and hillslope maps
         @param patchMap String representing the name of the patch map
         @param zoneMap String representing the name of the zone map 
@@ -54,4 +85,42 @@ def getFQPatchIDForCoordinates(easting, northing, grassMapset, patchMap, zoneMap
     zoneID = None
     hillID = None
     
+    ## Set up GRASS environment
+    gisBase = grassConfig.gisbase
+    sys.path.append(os.path.join(gisBase, 'etc', 'python'))
+    os.environ['LD_LIBRARY_PATH'] = os.path.join(gisBase, 'lib')
+    os.environ['DYLD_LIBRARY_PATH'] = os.path.join(gisBase, 'lib')
+    # Write grassrc
+    os.environ['GISRC'] = _initializeGrassrc(grassConfig)
+    os.environ['GIS_LOCK'] = str(os.getpid())  
+    from grass.lib import gis as grass
+    grass.G_gisinit('')
+    
+    window = grass.Cell_head()
+    grass.G_get_window(byref(window))
+    
+    # Translate coordinates to row, col
+    row = int( grass.G_northing_to_row(northing, byref(window)) )
+    col = int( grass.G_easting_to_col(easting, byref(window)) )
+    #print("row: %d, col: %d\n" % (row, col) )
+    
+    # Get number of rows
+    numRows = grass.G_window_rows()
+    numCols = grass.G_window_cols()
+    #print("num rows: %d, num cols: %d\n" % (numRows, numCols) )
+    
+    # Get patch ID
+    patchID = _getValueForCell(patchMap, row, col)
+    #print("PatchID: %d\n" % (patchID,) )
+    
+    # Get zone ID
+    zoneID = _getValueForCell(zoneMap, row, col)
+    #print("ZoneID: %d\n" % (zoneID,) )
+    
+    # Get hillslope ID
+    hillID = _getValueForCell(hillslopeMap, row, col)
+    #print("HillID: %d\n" % (hillID,) )
+    
+    os.environ['GIS_LOCK'] = ''
+    os.unlink(os.environ['GISRC'])
     return (patchID, zoneID, hillID)
