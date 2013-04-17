@@ -7,35 +7,41 @@
 {% endblock %}
 
 {% block extra_js %}
+    <script src="http://maps.google.com/maps/api/js?v=3&amp;sensor=false"></script>
     <script src="http://openlayers.org/dev/OpenLayers.debug.js"></script>
     <script type="text/javascript">
         $(function() {
-            var in_options = {
+            var prj = {
                 internalProjection: new OpenLayers.Projection('EPSG:900913'),
                 externalProjection: new OpenLayers.Projection("EPSG:4326")
             };
 
-            var wkt = new OpenLayers.Format.WKT(in_options);
+            var wkt = new OpenLayers.Format.WKT(prj);
             var feature = wkt.read("{{ page.renderedlayer.data_resource.spatial_metadata.bounding_box.wkt }}");
             var bounds = feature.geometry.getBounds();
 
             var wms = new OpenLayers.Layer.WMS('{{ page.renderedlayer.title }}', "/ga_resources/wms/", {
                 styles: "{{ page.renderedlayer.default_style.slug }}",
                 layers: "{{ page.renderedlayer.slug }}",
-                transparent: true
+                transparent: true,
+                raster: 'patch_5m'
             });
 
+            var styleMap = new OpenLayers.StyleMap({
+                pointRadius: 3,
+                fillOpacity: 0.3,
+                fillColor: "#FA9FB5",
+                strokeColor: "#C51B8A",
+                graphicName: 'square'
+            });
+            var receivers = new OpenLayers.Layer.Vector('receivers', {styleMap : styleMap});
+
             var map = new OpenLayers.Map({ div:'map', projection: "EPSG:900913", layers: [
-                new OpenLayers.Layer.XYZ(
-                        "OpenStreetMap",
-                        [
-                            "http://otile1.mqcdn.com/tiles/1.0.0/map/${z}/${x}/${y}.png",
-                            "http://otile2.mqcdn.com/tiles/1.0.0/map/${z}/${x}/${y}.png",
-                            "http://otile3.mqcdn.com/tiles/1.0.0/map/${z}/${x}/${y}.png",
-                            "http://otile4.mqcdn.com/tiles/1.0.0/map/${z}/${x}/${y}.png"
-                        ]
+                new OpenLayers.Layer.Google("Google", {type: google.maps.MapTypeId.HYBRID, numZoomLevels: 20}
+
                 ),
-                wms
+                wms,
+                receivers
             ]});
 
             map.zoomToExtent(bounds);
@@ -44,16 +50,21 @@
                 url: '/ga_resources/wms/',
                 title: 'Identify features by clicking',
                 layers: [wms],
-                queryVisible: true
+                queryVisible: true,
+                handlerOptions : { stopSingle: false }
             });
+
 
             function showInfo(evt) {
                 alert(evt.text);
                 return true;
             }
 
+            receivers.addFeatures(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(-8543333, 4763295)));
+
             featureinfo.events.register("getfeatureinfo", null, showInfo);
             map.addControl(featureinfo);
+            map.addControl(new OpenLayers.Control.MousePosition());
             featureinfo.activate();
         });
     </script>

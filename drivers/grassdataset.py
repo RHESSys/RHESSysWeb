@@ -60,12 +60,17 @@ class Grass(drivers.Driver):
         crx = osr.CoordinateTransformation(r_srs, s_srs)
 
         easting, northing, _ = crx.TransformPoint(wherex, wherey)
-        dataset_name = kwargs['raster'] if 'raster' in kwargs else self.env.default_raster
+        dataset_name = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
         values = self.g.read_command("r.what", **{
             "input" : dataset_name,
             "null" : "None", "east_north" :
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
+
+        ### everything below here is specific to rhessys and the hackathon ###
+        
+
+        ### everything above here is specific to rhessys and the hackathon ###
 
         return {
             "easting" : easting,
@@ -112,7 +117,7 @@ class Grass(drivers.Driver):
         xx0, yy0, _ = crx.TransformPoint(x0, y0)
         xx1, yy1, _ = crx.TransformPoint(x1, y1)
 
-        raster = kwargs['raster'] if 'raster' in kwargs else self.env.default_raster
+        raster = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
         if not os.path.exists(cached_tiff):
