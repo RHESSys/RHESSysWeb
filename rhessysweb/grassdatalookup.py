@@ -137,6 +137,9 @@ def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hill
     grass.G_close_cell(hillFd)
     grass.G_free(hillRast)
     
+    os.environ['GIS_LOCK'] = ''
+    os.unlink(os.environ['GISRC'])
+    
     return coords
 
 
@@ -190,6 +193,7 @@ def getFQPatchIDForCoordinates(easting, northing, grassConfig, patchMap, zoneMap
     
     os.environ['GIS_LOCK'] = ''
     os.unlink(os.environ['GISRC'])
+    
     return (patchID, zoneID, hillID)
 
 
