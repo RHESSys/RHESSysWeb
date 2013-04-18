@@ -58,7 +58,7 @@ class TestGRASSDataLookup(TestCase):
     
     def setUp(self):
         # We zip the GRASSData folder to be nice to GitHub, unzip it
-        self.grassDBasePath = os.path.abspath('./data/GRASSData')
+        self.grassDBasePath = os.path.abspath('./tests/data/GRASSData')
         grassDBaseZip = "%s.zip" % (self.grassDBasePath,)
         if not os.access(grassDBaseZip, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read GRASS data zip %s" %
