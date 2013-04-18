@@ -57,6 +57,8 @@ def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hill
         @param hillslopeMap String representing the name of the hillslope map
         
         @return List of rhessysweb.types.CoordinatePair objects
+        
+        @todo Handle non-grid patches, return the coordinates of their centroid
     """
     coords = list()
     
@@ -125,8 +127,8 @@ def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hill
                     zoneRast[col] == fqPatchID.zoneID and \
                     hillRast[col] == fqPatchID.hillID:
                     # Match found, get its coordinates
-                    easting = grass.G_col_to_easting(col, byref(window))
-                    northing = grass.G_row_to_northing(row, byref(window))
+                    easting = grass.G_col_to_easting(col + 0.5, byref(window))
+                    northing = grass.G_row_to_northing(row + 0.5, byref(window))
                     coords.append(rhessysweb.types.getCoordinatePair(easting, northing))
     
     # Clean up

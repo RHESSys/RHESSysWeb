@@ -75,6 +75,7 @@ class TestGRASSDataLookup(TestCase):
         self.grassMapset = GRASSConfig(gisbase=gisbase, dbase=self.grassDBasePath, location='DR5', mapset='taehee')
         
         self.inPatchID = 288804
+        #self.inPatchID = 289650
         self.inZoneID = 145
         self.inHillID = 145
         self.easting = 349100.0

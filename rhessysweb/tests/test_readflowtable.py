@@ -40,9 +40,11 @@ python -m unittest test_readflowtable
 """ 
 import os, errno
 import gzip
+import filecmp
 from unittest import TestCase
 
 from rhessysweb.readflowtable import readFlowtable
+from rhessysweb.readflowtable import writeFlowtable
 from rhessysweb.readflowtable import getReceiversForFlowtableEntry
 from rhessysweb.types import getFQPatchIDFromArray
 
@@ -60,10 +62,10 @@ class TestReadFlowtable(TestCase):
         if not os.access(flowtableGz, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read flow table %s" %
                       flowtableGz)
-        flowtableDir = os.path.split(flowtableGz)[0]
-        if not os.access(flowtableDir, os.W_OK):
+        self.flowtableDir = os.path.split(flowtableGz)[0]
+        if not os.access(self.flowtableDir, os.W_OK):
             raise IOError(errno.EACCES, "Unable to write to flow table dir %s" %
-                          flowtableDir)
+                          self.flowtableDir)
         fIn = gzip.open(flowtableGz, 'rb')
         fOut = open(self.flowtablePath, 'wb')
         fOut.write(fIn.read())
@@ -76,6 +78,12 @@ class TestReadFlowtable(TestCase):
     def tearDown(self):
         # Get rid of the un-gzipped flow table
         os.unlink(self.flowtablePath)
+
+    def testReadWriteFlowtable(self):
+        testOutpath = os.path.join(self.flowtableDir, "test-flow.flow")
+        writeFlowtable(self.flowtable, testOutpath)
+        self.assertTrue( filecmp.cmp(self.flowtablePath, testOutpath) )
+        os.unlink(testOutpath)
 
     def testEntryWithoutRoad(self):
         testKeyStr = "328469    145    145"
