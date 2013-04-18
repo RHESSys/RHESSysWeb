@@ -72,27 +72,20 @@ def getFlowTableEntryFromArray(values):
                           numAdjacent=int(values[10]) )
 
 
-#class FlowTableEntryReceiver:
-#    def __init__(self, patchID, zoneID, hillID, gamma):
-#        self.patchID = patchID
-#        self.zoneID = zoneID
-#        self.hillID = hillID
-
-
-FlowTableEntryReceiver = namedtuple('FlowTableEntryReceiver', ['patchID', 'zoneID', 'hillID', 'gamma'], verbose=False)
-
-def getFlowTableEntryReceiverFromArray(values):
-    """ @brief Build a FlowTableEntryReceiver from an array
-        @param values Array of strings representing tokenized flow table entry
-        receiver
-        @return FlowTableEntryReciver representing the flow table entry
-    """
-    assert( len(values) == FLOW_ENTRY_ITEM_NUM_TOKENS )
-    return FlowTableEntryReceiver(patchID=int(values[0]),\
-                                  zoneID=int(values[1]), \
-                                  hillID=int(values[2]), \
-                                  gamma=float(values[3]) )
-
+class FlowTableEntryReceiver:
+    def __init__(self, patchID, zoneID, hillID, gamma):
+        """ @brief Build a FlowTableEntryReceiver
+            @param patchID String representing the patch ID, will be cast to an int
+            @param zoneID String representing the zone ID, will be cast to an int
+            @param hillID String representing the hill ID, will be cast to an int
+            @param gamma String representing the gamma, will be cast to a float
+            @return FlowTableEntryReciver representing the flow table entry
+        """
+        self.patchID = int(patchID)
+        self.zoneID = int(zoneID)
+        self.hillID = int(hillID)
+        self.gamma = float(gamma)
+   
 FlowTableEntryRoad = namedtuple('FlowTableEntryReceiver', ['streamPatchID', 'streamZoneID', 'streamHillID', 'roadWidth'], verbose=False) 
 
 def getFlowTableEntryRoadFromArray(values):
@@ -192,7 +185,7 @@ def readFlowtable(flowtable):
             if numRead == numAdj:
                 item = getFlowTableEntryRoadFromArray(values)
             else:
-                item = getFlowTableEntryReceiverFromArray(values)
+                item = FlowTableEntryReceiver(values[0], values[1], values[2], values[3])
                 numRead += 1
             # Write item to flow table entry
             flowDict[currEntry].append(item)
@@ -217,13 +210,4 @@ def getReceiversForFlowtableEntry(key, flowtable):
     
     return recvs
 
-
-def updateReceiversForFlowtableEntry(key, newEntries, flowtable):
-    """ @brief Update list of receivers for a given flow table key
-    
-        @param key rhessysweb.types.FQPatchID
-        @param newEntries List of FlowTableEntryReceiver objects
-        @param flowtable Dict returned by readFlowtable
-    """
-    pass
 

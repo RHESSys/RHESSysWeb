@@ -46,7 +46,6 @@ from unittest import TestCase
 from flowtableio import readFlowtable
 from flowtableio import writeFlowtable
 from flowtableio import getReceiversForFlowtableEntry
-from flowtableio import updateReceiversForFlowtableEntry
 from rhessystypes import getFQPatchIDFromArray
 
 
@@ -139,9 +138,8 @@ class TestReadFlowtable(TestCase):
         numReceivers = len(receivers)
         newGamma = float(1 / numReceivers)
         for receiver in receivers:
-            print( type(receiver) )
             receiver.gamma = newGamma
-        updateReceiversForFlowtableEntry(testEntry, receivers, self.flowtable)
+
         receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
         for receiver in receivers:
             self.assertTrue( receiver.gamma == newGamma )
@@ -150,5 +148,30 @@ class TestReadFlowtable(TestCase):
         self.assertTrue( len(items) == 9 )
         # Test flow table entry
         self.assertTrue( items[0].patchID == 328469)
+        
+    def testUpdateReceiversForFlowtableEntryWithRoad(self):
+        testKeyStr = "366555    145    145"
+        values = testKeyStr.split()
+        testEntry = getFQPatchIDFromArray(values)
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        # Test flow table entry
+        self.assertTrue( items[0].patchID == 366555)
+        
+        numReceivers = len(receivers)
+        newGamma = float(1 / numReceivers)
+        for receiver in receivers:
+            receiver.gamma = newGamma
+        
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        for receiver in receivers:
+            self.assertTrue( receiver.gamma == newGamma )
+            
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        # Test flow table entry
+        self.assertTrue( items[0].patchID == 366555)
         
 
