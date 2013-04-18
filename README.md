@@ -3,6 +3,14 @@ RHESSysWeb
 
 Web tool for developing and manipulating RHESSys input datasets
 
+Tests
+-----
+
+The RHESSysWeb project has a growing suite of tests that can be run via python's unittest module.  Tests are defined as .py modules in the `tests` directory.
+
+These tests can be run manually:
+
+    $ GISBASE=/usr/lib/grass64 LD_LIBRARY_PATH=$GISBASE/lib python -m unittest discover
 
 Continuous Integration Testing
 ------------------------------
