@@ -9,7 +9,7 @@ import os
 import sh
 
 # if 'LD_LIBRARY_PATH' not in os.environ or '/usr/lib/grass64/lib' not in os.environ['LD_LIBRARY_PATH']:
-os.environ['LD_LIBRARY_PATH'] = ';'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
+os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
 
 import grass.script as g
 import grass.script.setup as gsetup
@@ -44,6 +44,9 @@ class Grass(drivers.Driver):
         return self._region
 
     def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
+        os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
+        os.environ['DYLD_LIBRARY_PATH'] = os.path.join(settings.GISBASE, 'lib')
+
         s_srs = osr.SpatialReference()
         r_srs = osr.SpatialReference()
 
@@ -60,23 +63,74 @@ class Grass(drivers.Driver):
         crx = osr.CoordinateTransformation(r_srs, s_srs)
 
         easting, northing, _ = crx.TransformPoint(wherex, wherey)
-        dataset_name = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
-        values = self.g.read_command("r.what", **{
-            "input" : dataset_name,
+        #dataset_name = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
+        #values = self.g.read_command("r.what", **{
+        #    "input" : dataset_name,
+        #    "null" : "None", "east_north" :
+        #    "{easting},{northing}".format(easting=easting, northing=northing)
+        #}).strip().split('|')
+
+        ### everything below here is specific to rhessys and the hackathon ###
+
+        _, _, _, patch = self.g.read_command("r.what", **{
+            "input" : 'patch_5m',
             "null" : "None", "east_north" :
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
 
-        ### everything below here is specific to rhessys and the hackathon ###
-        
+        _, _, _, hillslope = self.g.read_command("r.what", **{
+            "input" : 'hillslope',
+            "null" : "None", "east_north" :
+            "{easting},{northing}".format(easting=easting, northing=northing)
+        }).strip().split('|')
+
+        _, _, _, zone = self.g.read_command("r.what", **{
+            "input" : 'hillslope',
+            "null" : "None", "east_north" :
+            "{easting},{northing}".format(easting=easting, northing=northing)
+        }).strip().split('|')
+
+        from RHESSysWeb.rhessysweb import grassdatalookup, readflowtable, types
+
+        patch = int(patch)
+        hillslope = int(hillslope)
+        zone = int(zone)
+
+        fqpatch_id = types.FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
+
+        if not hasattr(self, 'flow_table'):
+            self.flow_table = readflowtable.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+
+        receivers = readflowtable.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
+
+
+        coords = grassdatalookup.getCoordinatesForFQPatchIDs(
+            receivers,
+            grassdatalookup.GRASSConfig(gisbase=settings.GISBASE, dbase=self.env.database, location=self.env.location, mapset=self.env.map_set),
+            'patch_5m','hillslope','hillslope')
+
+        print len(coords)
+
+        xrc = osr.CoordinateTransformation(s_srs, r_srs)
+        coords = [{
+                      "type" : "Feature",
+                      "geometry" : { "type" : "Point", "coordinates" : xrc.TransformPoint(a.easting, a.northing)[0:2] },
+                      "properties" : {}
+                  }
+                   for a in coords]
+
+        return {
+            "type" : "FeatureCollection",
+            "features" : coords
+        }
 
         ### everything above here is specific to rhessys and the hackathon ###
 
-        return {
-            "easting" : easting,
-            "northing" : northing,
-            dataset_name : values[-1]
-        }
+        #return {
+        #    "easting" : easting,
+        #    "northing" : northing,
+        #    dataset_name : values[-1]
+        #}
 
     def get_metadata(self, **kwargs):
         return []

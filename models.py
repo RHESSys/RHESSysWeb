@@ -6,3 +6,4 @@ class GrassEnvironment(Page, RichText):
     location = models.CharField(max_length=255)
     map_set = models.CharField(max_length=255)
     default_raster = models.CharField(max_length=255, null=True, blank=True)
+    flow_table = models.FileField(upload_to='rhessysweb', null=True, blank=True) # RHESSys specific.  move later.

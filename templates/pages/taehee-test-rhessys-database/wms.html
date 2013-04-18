@@ -17,6 +17,7 @@
             };
 
             var wkt = new OpenLayers.Format.WKT(prj);
+            var json = new OpenLayers.Format.GeoJSON();
             var feature = wkt.read("{{ page.renderedlayer.data_resource.spatial_metadata.bounding_box.wkt }}");
             var bounds = feature.geometry.getBounds();
 
@@ -37,9 +38,7 @@
             var receivers = new OpenLayers.Layer.Vector('receivers', {styleMap : styleMap});
 
             var map = new OpenLayers.Map({ div:'map', projection: "EPSG:900913", layers: [
-                new OpenLayers.Layer.Google("Google", {type: google.maps.MapTypeId.HYBRID, numZoomLevels: 20}
-
-                ),
+                new OpenLayers.Layer.Google("Google", {type: google.maps.MapTypeId.HYBRID, numZoomLevels: 20}),
                 wms,
                 receivers
             ]});
@@ -56,11 +55,18 @@
 
 
             function showInfo(evt) {
-                alert(evt.text);
+                var j = JSON.parse(evt.text);
+                j = j['taehee-test-rhessys-database/wms'];
+                var features = json.read(j);
+                receivers.removeAllFeatures();
+                receivers.addFeatures(features);
+                receivers.redraw();
+                console.log(receivers);
+
                 return true;
             }
 
-            receivers.addFeatures(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(-8543333, 4763295)));
+//            receivers.addFeatures(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(-8543333, 4763295)));
 
             featureinfo.events.register("getfeatureinfo", null, showInfo);
             map.addControl(featureinfo);
