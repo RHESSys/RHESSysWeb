@@ -44,6 +44,7 @@ python -m unittest ReadFlowtable
 """
 import os, sys, errno
 from collections import namedtuple
+from collections import OrderedDict
 import argparse
 
 import rhessysweb.types
@@ -102,6 +103,40 @@ def getFlowTableEntryRoadFromArray(values):
                                roadWidth=float(values[3]) )
 
 ## Function definitions
+def writeFlowtable(flowtableDict, flowtableOutfile):
+    """ @brief Write a RHESSys flow table from a representation stored in collections.OrderedDict
+        returned by readFlowtable.
+        
+        @param flowtableDict Flow table as returned by readFlowtable
+        @param flowtableOutfile String representing the absolute path of the flow table to be written
+    """
+    flowtableOutdir = os.path.split(flowtableOutfile)[0]
+    if not os.access(flowtableOutdir, os.W_OK):
+        raise IOError("Unable to write to output directory %s\n" % (flowtableOutdir,) )
+    flowFile = open(flowtableOutfile, 'w')
+    
+    keys = flowtableDict.keys()
+    numKeys = len(keys)
+    
+    flowFile.write("%8d" % (numKeys,) )
+    for key in keys:
+        items = flowtableDict[key]
+        for item in items:
+            if isinstance(item, FlowTableEntryReceiver):
+                flowFile.write("\n%16d %6d %6d %8.8f  " % \
+                               (item.patchID, item.zoneID, item.hillID, item.gamma) )
+            elif isinstance(item, FlowTableEntry):
+                flowFile.write("\n %6d %6d %6d %6.1f %6.1f %6.1f %10f %d %4d %f %4d" % \
+                               (item.patchID, item.zoneID, item.hillID, item.x, item.y, \
+                                item.z, item.accumArea, item.area, item.landType, \
+                                item.totalGamma, item.numAdjacent) )
+            elif isinstance(item, FlowTableEntryRoad):
+                flowFile.write("\n%16d %6d %6d %lf" % \
+                               (item.streamPatchID, item.streamZoneID, item.streamHillID, \
+                               item.roadWidth) )
+    
+    flowFile.close()
+
 def readFlowtable(flowtable):
     """ @brief Read a RHESSys flow table into a dict where the keys are 
         instances of rhessysweb.types.FQPatchID and the values lists containing one or more
@@ -113,7 +148,8 @@ def readFlowtable(flowtable):
 
         @return The dict representing the flow table
     """
-    flowDict = dict()
+    #flowDict = dict()
+    flowDict = OrderedDict()
     flow = open(flowtable, 'r')
 
     numPatches = flow.readline().lstrip()
