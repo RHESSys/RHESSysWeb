@@ -58,7 +58,7 @@ class TestReadFlowtable(TestCase):
 
     def setUp(self):
         # We gzip the flow table to be nice to GitHub, unzip it
-        self.flowtablePath = os.path.abspath('./data/dr5_5m_preroof.flow.flow')
+        self.flowtablePath = os.path.abspath('./tests/data/dr5_5m_preroof.flow.flow')
         flowtableGz = "%s.gz" % (self.flowtablePath,)
         if not os.access(flowtableGz, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read flow table %s" %
