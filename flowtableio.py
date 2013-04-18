@@ -1,6 +1,7 @@
-"""@package rhessysweb.readflowtable
+"""@package flowtableio
 
-@brief Read a RHESSys flow table into a dict where the keys are
+@brief Routines for reading, modifying, and writing RHESSys flow tables.
+        The flow table is structured into a dict where the keys are
         instances of FlowTableEntry and the values lists containing
         one or more FlowTableEntries followed by possibly one
         FlowTableEntryReceive objects. To test run with the flow table
@@ -37,17 +38,13 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 @author Brian Miles <brian_miles@unc.edu>
 
-Usage: 
-@code
-python -m unittest ReadFlowtable
-@endcode
 """
 import os, sys, errno
 from collections import namedtuple
 from collections import OrderedDict
 import argparse
 
-import RHESSysWeb.types
+import rhessystypes
 
 ## Constants
 LAND_TYPE_ROAD = 2
@@ -73,6 +70,14 @@ def getFlowTableEntryFromArray(values):
                           landType=int(values[8]), \
                           totalGamma=float(values[9]), \
                           numAdjacent=int(values[10]) )
+
+
+#class FlowTableEntryReceiver:
+#    def __init__(self, patchID, zoneID, hillID, gamma):
+#        self.patchID = patchID
+#        self.zoneID = zoneID
+#        self.hillID = hillID
+
 
 FlowTableEntryReceiver = namedtuple('FlowTableEntryReceiver', ['patchID', 'zoneID', 'hillID', 'gamma'], verbose=False)
 
@@ -172,7 +177,7 @@ def readFlowtable(flowtable):
 
             # FlowDict uses a FlowTableKey as reference, adds newEntry and items as entries
             newEntry = getFlowTableEntryFromArray(values)
-            newKey = RHESSysWeb.types.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
+            newKey = rhessystypes.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
             flowDict[newKey] = list()
             flowDict[newKey].append(newEntry)
             readReceivers = True
@@ -212,4 +217,13 @@ def getReceiversForFlowtableEntry(key, flowtable):
     
     return recvs
 
+
+def updateReceiversForFlowtableEntry(key, newEntries, flowtable):
+    """ @brief Update list of receivers for a given flow table key
+    
+        @param key rhessysweb.types.FQPatchID
+        @param newEntries List of FlowTableEntryReceiver objects
+        @param flowtable Dict returned by readFlowtable
+    """
+    pass
 
