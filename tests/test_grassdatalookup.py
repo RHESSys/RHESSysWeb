@@ -88,7 +88,7 @@ class TestGRASSDataLookup(TestCase):
         rmtree(self.grassDBasePath)
    
    
-    def testGetCoordindateForFQPatchIDs(self):
+    def testGetCoordinatesForFQPatchIDs(self):
         fqPatchIDs = [ (rhessystypes.FQPatchID(patchID=self.inPatchID, \
                                                    zoneID=self.inZoneID, hillID=self.inHillID)) ]
         coords = getCoordinatesForFQPatchIDs(fqPatchIDs, self.grassMapset, self.patchMap, self.zoneMap, self.hillslopeMap)
