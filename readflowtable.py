@@ -47,7 +47,7 @@ from collections import namedtuple
 from collections import OrderedDict
 import argparse
 
-import rhessysweb.types
+import RHESSysWeb.types
 
 ## Constants
 LAND_TYPE_ROAD = 2
@@ -172,7 +172,7 @@ def readFlowtable(flowtable):
 
             # FlowDict uses a FlowTableKey as reference, adds newEntry and items as entries
             newEntry = getFlowTableEntryFromArray(values)
-            newKey = rhessysweb.types.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
+            newKey = RHESSysWeb.types.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
             flowDict[newKey] = list()
             flowDict[newKey].append(newEntry)
             readReceivers = True

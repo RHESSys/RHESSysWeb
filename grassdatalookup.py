@@ -38,7 +38,7 @@ import tempfile
 from collections import namedtuple
 from ctypes import *
 
-import rhessysweb.types
+import RHESSysWeb.types
 
 GRASSConfig = namedtuple('GRASSConfig', ['gisbase', 'dbase', 'location', 'mapset'], verbose=False)
 
@@ -129,7 +129,7 @@ def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hill
                     # Match found, get its coordinates
                     easting = grass.G_col_to_easting(col + 0.5, byref(window))
                     northing = grass.G_row_to_northing(row + 0.5, byref(window))
-                    coords.append(rhessysweb.types.getCoordinatePair(easting, northing))
+                    coords.append(RHESSysWeb.types.getCoordinatePair(easting, northing))
     
     # Clean up
     grass.G_close_cell(patchFd)
