@@ -3,34 +3,44 @@ from osgeo import gdal, ogr, osr
 from django.conf import settings
 from django.contrib.gis.geos import Polygon
 import importlib
-import mapnik
-import sys
 import os
 import sh
 
-# if 'LD_LIBRARY_PATH' not in os.environ or '/usr/lib/grass64/lib' not in os.environ['LD_LIBRARY_PATH']:
-os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
-
-import grass.script.setup as gsetup
+import tempfile
 
 class Grass(drivers.Driver):
     def __init__(self, resource):
         super(Grass, self).__init__(data_resource=resource)
+        self.env = self.resource.parent.grassenvironment
         self.ensure_grass()
 
     def ensure_grass(self):
-        os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
-        os.putenv("LD_LIBRARY_PATH",':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"]))
-        os.environ['DYLD_LIBRARY_PATH'] = os.path.join(settings.GISBASE, 'lib')
-        os.putenv("DYLD_LIBRARY_PATH", os.path.join(settings.GISBASE, "lib"))
-        os.environ['GIS_LOCK'] = str(os.getpid())
-        os.putenv('GIS_LOCK',str(os.getpid()))
+        if 'GISRC' not in os.environ:
+            os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
+            os.putenv("LD_LIBRARY_PATH",':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"]))
+            os.environ['DYLD_LIBRARY_PATH'] = os.path.join(settings.GISBASE, 'lib')
+            os.putenv("DYLD_LIBRARY_PATH", os.path.join(settings.GISBASE, "lib"))
+            os.environ['GIS_LOCK'] = str(os.getpid())
+            os.putenv('GIS_LOCK',str(os.getpid()))
+            os.environ['GISRC'] = self._initializeGrassrc()
+            os.putenv('GISRC', os.environ['GISRC'])
 
-        self.env = self.resource.parent.grassenvironment
+        if 'LOCATION_NAME' not in os.environ:
+            os.environ['LOCATION_NAME'] = self.env.location
+            os.putenv('LOCATION_NAME', self.env.location)
 
-        self._gsetup = gsetup
+        if not hasattr(self, '_gsetup'):
+            self._gsetup = importlib.import_module('grass.script.setup')
+            self.g = importlib.import_module("grass.script")
+
         self._gsetup.init(settings.GISBASE, self.env.database, self.env.location, self.env.map_set)
-        self.g = importlib.import_module("grass.script")
+
+    def _initializeGrassrc(self):
+        grassRcFile = tempfile.NamedTemporaryFile(prefix='grassrc-', delete=False)
+        grassRcContent = "GISDBASE: %s\nLOCATION_NAME: %s\nMAPSET: %s\n" % \
+            (self.env.database, self.env.location, self.env.map_set)
+        grassRcFile.write(grassRcContent)
+        return grassRcFile.name
 
     def get_data_fields(self, **kwargs):
         return self.g.raster.list_pairs('rast')
@@ -53,7 +63,6 @@ class Grass(drivers.Driver):
         return self._region
 
     def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
-
         r_srs = osr.SpatialReference()
 
         if isinstance(srs, basestring):
@@ -95,19 +104,18 @@ class Grass(drivers.Driver):
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
 
-        from RHESSysWeb import grassdatalookup, readflowtable, types
+        from RHESSysWeb import grassdatalookup, flowtableio, rhessystypes
 
         patch = int(patch)
         hillslope = int(hillslope)
         zone = int(zone)
 
-        fqpatch_id = types.FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
+        fqpatch_id = rhessystypes.FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
 
         if not hasattr(self, 'flow_table'):
-            self.flow_table = readflowtable.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+            self.flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
 
-        receivers = [fqpatch_id] + readflowtable.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
-
+        receivers = [fqpatch_id] + flowtableio.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
 
         coords = grassdatalookup.getCoordinatesForFQPatchIDs(
             receivers,
@@ -117,7 +125,9 @@ class Grass(drivers.Driver):
         print len(coords)
 
         xrc = osr.CoordinateTransformation(self.proj, r_srs)
-        rasters = self.g.raster.list_strings('rast')
+        self.ensure_grass()
+
+        rasters = self.g.list_strings('rast')
         def best_type(k):
             try:
                 return int(k)
