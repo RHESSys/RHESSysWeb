@@ -38,17 +38,35 @@ import tempfile
 from collections import namedtuple
 from ctypes import *
 
+from osgeo import osr
+
 import rhessystypes
 
 GRASSConfig = namedtuple('GRASSConfig', ['gisbase', 'dbase', 'location', 'mapset'], verbose=False)
 
+
+def getSpatialReferenceForGRASSDataset(grassConfig):
+    """ @brief Return the spatial reference for a GRASS mapset 
+
+        @param grassConfig GRASSConfig specifying the GRASS mapset
+        that contains 
+
+        @return osgeo.osr instance representing the
+        spatial reference
+    """
+    _setupGrassScriptingEnvironment(grassConfig)
+    import grass.script as grass
+    s_srs = osr.SpatialReference()
+    proj = grass.read_command('g.proj', flags='j')
+    s_srs.ImportFromProj4( proj )
+    return s_srs
 
 def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hillslopeMap):
     """ @brief Get the geographic coordinates for a list of patches identified by
         their fully qualified patch ID. The fully qualified patch ID is the combination 
         of the patchID, zoneID, and hillslopeID.
     
-        @param List of rhessysweb.types.FQPatchID objects representing a fully qualified 
+        @param List of rhessystypes.FQPatchID objects representing a fully qualified 
         patch ID
         @param grassConfig GRASSConfig specifying the GRASS mapset that contains 
         the patch, zone, and hillslope maps
@@ -145,20 +163,19 @@ def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hill
     return coords
 
 
-def getFQPatchIDForCoordinates(easting, northing, grassConfig, patchMap, zoneMap, hillslopeMap):
+def getFQPatchIDForCoordinates(coordinate, grassConfig, patchMap, zoneMap, hillslopeMap):
     """ @brief Get the fully qualified ID of the patch located at a coordinate pair.
         The fully qualified patch ID is the combination of the patchID, zoneID,
         and hillslopeID.
     
-        @param easting Float represting the easting coordinate
-        @param northing Float representing the northing coordinate
+        @param coordinate rhessystypes.CoordinatePair
         @param grassConfig GRASSConfig specifying the GRASS mapset that contains 
         the patch, zone, and hillslope maps
         @param patchMap String representing the name of the patch map
         @param zoneMap String representing the name of the zone map 
         @param hillslopeMap String representing the name of the hillslope map
         
-        @return Tuple (patchID, zoneID, hillID)
+        @return FQPatchID
     """
     patchID = None
     zoneID = None
@@ -172,8 +189,8 @@ def getFQPatchIDForCoordinates(easting, northing, grassConfig, patchMap, zoneMap
     # Translate coordinates to row, col
     window = grass.Cell_head()
     grass.G_get_window(byref(window))
-    row = int( grass.G_northing_to_row(northing, byref(window)) )
-    col = int( grass.G_easting_to_col(easting, byref(window)) )
+    row = int( grass.G_northing_to_row(coordinate.northing, byref(window)) )
+    col = int( grass.G_easting_to_col(coordinate.easting, byref(window)) )
     #print("row: %d, col: %d\n" % (row, col) )
     
     # Get number of rows
@@ -196,11 +213,27 @@ def getFQPatchIDForCoordinates(easting, northing, grassConfig, patchMap, zoneMap
     os.environ['GIS_LOCK'] = ''
     os.unlink(os.environ['GISRC'])
     
-    return (patchID, zoneID, hillID)
+    return rhessystypes.FQPatchID(patchID=int(patchID), zoneID=int(zoneID), hillID=int(hillID))
+
+
+def _setupGrassScriptingEnvironment(grassConfig):
+    """ @brief Set up GRASS environment for using GRASS scripting API from 
+        Python (e.g. grass.script)
+    """
+    os.environ['GISBASE'] = grassConfig.gisbase
+    sys.path.append(os.path.join(grassConfig.gisbase, 'etc', 'python'))
+    #os.environ['LD_LIBRARY_PATH'] = os.path.join(grassConfig.gisbase, 'lib')
+    #os.environ['DYLD_LIBRARY_PATH'] = os.path.join(grassConfig.gisbase, 'lib')
+    import grass.script.setup as gsetup
+    gsetup.init(grassConfig.gisbase, \
+                grassConfig.dbase, grassConfig.location, \
+                grassConfig.mapset)
 
 
 def _setupGrassEnvironment(grassConfig):
-    ## Set up GRASS environment
+    """ @brief Set up GRASS environment for using GRASS low-level API from 
+        Python (e.g. grass.lib)
+    """
     gisBase = grassConfig.gisbase
     sys.path.append(os.path.join(gisBase, 'etc', 'python'))
     os.environ['LD_LIBRARY_PATH'] = os.path.join(gisBase, 'lib')

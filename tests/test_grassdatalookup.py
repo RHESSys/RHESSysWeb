@@ -88,7 +88,7 @@ class TestGRASSDataLookup(TestCase):
         rmtree(self.grassDBasePath)
    
    
-    def testGetCoordindateForFQPatchIDs(self):
+    def testGetCoordinatesForFQPatchIDs(self):
         fqPatchIDs = [ (rhessystypes.FQPatchID(patchID=self.inPatchID, \
                                                    zoneID=self.inZoneID, hillID=self.inHillID)) ]
         coords = getCoordinatesForFQPatchIDs(fqPatchIDs, self.grassMapset, self.patchMap, self.zoneMap, self.hillslopeMap)
@@ -98,8 +98,9 @@ class TestGRASSDataLookup(TestCase):
         self.assertTrue( abs(coordPair.northing - self.northing) < ZERO )
     
     def testGetFQPatchIDForCoordinates(self):
+        coordinate = rhessystypes.getCoordinatePair(self.easting, self.northing)
         (patchID, zoneID, hillID) = \
-            getFQPatchIDForCoordinates(self.easting, self.northing, self.grassMapset, \
+            getFQPatchIDForCoordinates(coordinate, self.grassMapset, \
                                        self.patchMap, self.zoneMap, self.hillslopeMap)
         self.assertTrue( self.inPatchID == patchID )
         self.assertTrue( self.inZoneID == zoneID )
