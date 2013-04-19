@@ -11,43 +11,49 @@ import sh
 # if 'LD_LIBRARY_PATH' not in os.environ or '/usr/lib/grass64/lib' not in os.environ['LD_LIBRARY_PATH']:
 os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
 
-import grass.script as g
 import grass.script.setup as gsetup
 
 class Grass(drivers.Driver):
     def __init__(self, resource):
         super(Grass, self).__init__(data_resource=resource)
-        self.env = resource.parent.grassenvironment
+        self.ensure_grass()
 
-        #os.environ['GISBASE'] = gisBase =  "/usr/lib/grass64"
-        #sys.path.append(os.path.join(gisBase, "etc", "python"))
+    def ensure_grass(self):
+        os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
+        os.putenv("LD_LIBRARY_PATH",':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"]))
+        os.environ['DYLD_LIBRARY_PATH'] = os.path.join(settings.GISBASE, 'lib')
+        os.putenv("DYLD_LIBRARY_PATH", os.path.join(settings.GISBASE, "lib"))
+        os.environ['GIS_LOCK'] = str(os.getpid())
+        os.putenv('GIS_LOCK',str(os.getpid()))
 
-        self.g = g
+        self.env = self.resource.parent.grassenvironment
+
         self._gsetup = gsetup
         self._gsetup.init(settings.GISBASE, self.env.database, self.env.location, self.env.map_set)
+        self.g = importlib.import_module("grass.script")
 
     def get_data_fields(self, **kwargs):
         return self.g.raster.list_pairs('rast')
 
     @property
     def proj(self):
+
         if not hasattr(self, '_proj'):
-            self._proj = self.g.raster.read_command('g.proj', flags='j')
+            self._proj = osr.SpatialReference()
+            self._proj.ImportFromProj4( self.g.raster.read_command('g.proj', flags='j') )
 
         return self._proj
 
     @property
     def region(self):
+
         if not hasattr(self, '_region'):
             self._region = self.g.region()
 
         return self._region
 
     def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
-        os.environ['LD_LIBRARY_PATH'] = ':'.join([os.environ['LD_LIBRARY_PATH'], "/usr/lib/grass64/lib"])
-        os.environ['DYLD_LIBRARY_PATH'] = os.path.join(settings.GISBASE, 'lib')
 
-        s_srs = osr.SpatialReference()
         r_srs = osr.SpatialReference()
 
         if isinstance(srs, basestring):
@@ -59,8 +65,7 @@ class Grass(drivers.Driver):
         else:
             r_srs.ImportFromEPSG(srs)
 
-        s_srs.ImportFromProj4(self.proj)
-        crx = osr.CoordinateTransformation(r_srs, s_srs)
+        crx = osr.CoordinateTransformation(r_srs, self.proj)
 
         easting, northing, _ = crx.TransformPoint(wherex, wherey)
         #dataset_name = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
@@ -90,7 +95,7 @@ class Grass(drivers.Driver):
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
 
-        from RHESSysWeb.rhessysweb import grassdatalookup, readflowtable, types
+        from RHESSysWeb import grassdatalookup, readflowtable, types
 
         patch = int(patch)
         hillslope = int(hillslope)
@@ -101,7 +106,7 @@ class Grass(drivers.Driver):
         if not hasattr(self, 'flow_table'):
             self.flow_table = readflowtable.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
 
-        receivers = readflowtable.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
+        receivers = [fqpatch_id] + readflowtable.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
 
 
         coords = grassdatalookup.getCoordinatesForFQPatchIDs(
@@ -111,13 +116,25 @@ class Grass(drivers.Driver):
 
         print len(coords)
 
-        xrc = osr.CoordinateTransformation(s_srs, r_srs)
+        xrc = osr.CoordinateTransformation(self.proj, r_srs)
+        rasters = self.g.raster.list_strings('rast')
+        def best_type(k):
+            try:
+                return int(k)
+            except:
+                try:
+                    return float(k)
+                except:
+                    return k
+
         coords = [{
                       "type" : "Feature",
                       "geometry" : { "type" : "Point", "coordinates" : xrc.TransformPoint(a.easting, a.northing)[0:2] },
-                      "properties" : {}
-                  }
-                   for a in coords]
+                      "properties" : dict(zip(
+                          rasters,
+                          [best_type(k) for k in self.g.read_command('r.what', input=rasters, east_north='{e},{n}'.format(e=a.easting, n=a.northing)).strip().split('|')]
+                      ))
+                  } for a in coords]
 
         return {
             "type" : "FeatureCollection",
@@ -136,6 +153,7 @@ class Grass(drivers.Driver):
         return []
 
     def compute_fields(self, **kwargs):
+
         r = self.region
         proj =  self.proj
 
@@ -156,17 +174,16 @@ class Grass(drivers.Driver):
         self.resource.spatial_metadata.save()
 
     def ready_data_resource(self, **kwargs):
-        r = self.region
-        proj =  self.proj
 
-        s_srs = osr.SpatialReference()
+        r = self.region
+        s_srs =  self.proj
+
         e3857 = osr.SpatialReference()
         e3857.ImportFromEPSG(3857)
-        s_srs.ImportFromProj4(proj)
         crx = osr.CoordinateTransformation(s_srs, e3857)
 
         x0, y0, x1, y1 = r['w'], r['s'], r['e'], r['n']
-        self.resource.spatial_metadata.native_srs = proj
+        self.resource.spatial_metadata.native_srs = s_srs.ExportToProj4()
 
         xx0, yy0, _ = crx.TransformPoint(x0, y0)
         xx1, yy1, _ = crx.TransformPoint(x1, y1)
