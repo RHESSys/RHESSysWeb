@@ -98,8 +98,9 @@ class TestGRASSDataLookup(TestCase):
         self.assertTrue( abs(coordPair.northing - self.northing) < ZERO )
     
     def testGetFQPatchIDForCoordinates(self):
+        coordinate = rhessystypes.getCoordinatePair(self.easting, self.northing)
         (patchID, zoneID, hillID) = \
-            getFQPatchIDForCoordinates(self.easting, self.northing, self.grassMapset, \
+            getFQPatchIDForCoordinates(coordinate, self.grassMapset, \
                                        self.patchMap, self.zoneMap, self.hillslopeMap)
         self.assertTrue( self.inPatchID == patchID )
         self.assertTrue( self.inZoneID == zoneID )
