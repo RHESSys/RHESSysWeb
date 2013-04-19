@@ -1,6 +1,7 @@
-"""@package rhessysweb.readflowtable
+"""@package flowtableio
 
-@brief Read a RHESSys flow table into a dict where the keys are
+@brief Routines for reading, modifying, and writing RHESSys flow tables.
+        The flow table is structured into a dict where the keys are
         instances of FlowTableEntry and the values lists containing
         one or more FlowTableEntries followed by possibly one
         FlowTableEntryReceive objects. To test run with the flow table
@@ -37,17 +38,13 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 @author Brian Miles <brian_miles@unc.edu>
 
-Usage: 
-@code
-python -m unittest ReadFlowtable
-@endcode
 """
 import os, sys, errno
 from collections import namedtuple
 from collections import OrderedDict
 import argparse
 
-import RHESSysWeb.types
+import rhessystypes
 
 ## Constants
 LAND_TYPE_ROAD = 2
@@ -74,20 +71,21 @@ def getFlowTableEntryFromArray(values):
                           totalGamma=float(values[9]), \
                           numAdjacent=int(values[10]) )
 
-FlowTableEntryReceiver = namedtuple('FlowTableEntryReceiver', ['patchID', 'zoneID', 'hillID', 'gamma'], verbose=False)
 
-def getFlowTableEntryReceiverFromArray(values):
-    """ @brief Build a FlowTableEntryReceiver from an array
-        @param values Array of strings representing tokenized flow table entry
-        receiver
-        @return FlowTableEntryReciver representing the flow table entry
-    """
-    assert( len(values) == FLOW_ENTRY_ITEM_NUM_TOKENS )
-    return FlowTableEntryReceiver(patchID=int(values[0]),\
-                                  zoneID=int(values[1]), \
-                                  hillID=int(values[2]), \
-                                  gamma=float(values[3]) )
-
+class FlowTableEntryReceiver:
+    def __init__(self, patchID, zoneID, hillID, gamma):
+        """ @brief Build a FlowTableEntryReceiver
+            @param patchID String representing the patch ID, will be cast to an int
+            @param zoneID String representing the zone ID, will be cast to an int
+            @param hillID String representing the hill ID, will be cast to an int
+            @param gamma String representing the gamma, will be cast to a float
+            @return FlowTableEntryReciver representing the flow table entry
+        """
+        self.patchID = int(patchID)
+        self.zoneID = int(zoneID)
+        self.hillID = int(hillID)
+        self.gamma = float(gamma)
+   
 FlowTableEntryRoad = namedtuple('FlowTableEntryReceiver', ['streamPatchID', 'streamZoneID', 'streamHillID', 'roadWidth'], verbose=False) 
 
 def getFlowTableEntryRoadFromArray(values):
@@ -172,7 +170,7 @@ def readFlowtable(flowtable):
 
             # FlowDict uses a FlowTableKey as reference, adds newEntry and items as entries
             newEntry = getFlowTableEntryFromArray(values)
-            newKey = RHESSysWeb.types.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
+            newKey = rhessystypes.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
             flowDict[newKey] = list()
             flowDict[newKey].append(newEntry)
             readReceivers = True
@@ -187,7 +185,7 @@ def readFlowtable(flowtable):
             if numRead == numAdj:
                 item = getFlowTableEntryRoadFromArray(values)
             else:
-                item = getFlowTableEntryReceiverFromArray(values)
+                item = FlowTableEntryReceiver(values[0], values[1], values[2], values[3])
                 numRead += 1
             # Write item to flow table entry
             flowDict[currEntry].append(item)

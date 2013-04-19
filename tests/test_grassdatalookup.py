@@ -1,4 +1,4 @@
-"""@package rhessysweb.tests.test_grassdatalookup
+"""@package tests.test_grassdatalookup
     
 @brief Test methods for rhessysweb.grassdatalookup
 
@@ -45,10 +45,10 @@ from shutil import rmtree
 from zipfile import ZipFile
 from unittest import TestCase
 
-import rhessysweb.types
-from rhessysweb.grassdatalookup import getFQPatchIDForCoordinates
-from rhessysweb.grassdatalookup import getCoordinatesForFQPatchIDs
-from rhessysweb.grassdatalookup import GRASSConfig
+import rhessystypes
+from grassdatalookup import getFQPatchIDForCoordinates
+from grassdatalookup import getCoordinatesForFQPatchIDs
+from grassdatalookup import GRASSConfig
 
 ## Constants
 ZERO = 3
@@ -58,7 +58,7 @@ class TestGRASSDataLookup(TestCase):
     
     def setUp(self):
         # We zip the GRASSData folder to be nice to GitHub, unzip it
-        self.grassDBasePath = os.path.abspath('./data/GRASSData')
+        self.grassDBasePath = os.path.abspath('./tests/data/GRASSData')
         grassDBaseZip = "%s.zip" % (self.grassDBasePath,)
         if not os.access(grassDBaseZip, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read GRASS data zip %s" %
@@ -88,8 +88,8 @@ class TestGRASSDataLookup(TestCase):
         rmtree(self.grassDBasePath)
    
    
-    def testGetCoordindateForFQPatchIDs(self):
-        fqPatchIDs = [ (rhessysweb.types.FQPatchID(patchID=self.inPatchID, \
+    def testGetCoordinatesForFQPatchIDs(self):
+        fqPatchIDs = [ (rhessystypes.FQPatchID(patchID=self.inPatchID, \
                                                    zoneID=self.inZoneID, hillID=self.inHillID)) ]
         coords = getCoordinatesForFQPatchIDs(fqPatchIDs, self.grassMapset, self.patchMap, self.zoneMap, self.hillslopeMap)
         self.assertTrue( len(coords) == 1 )

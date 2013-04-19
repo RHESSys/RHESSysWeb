@@ -17,6 +17,7 @@
 
 # OS files
 .DS_Store
+tests/data/__MACOSX/
 
 # Editor leftovers
 *~

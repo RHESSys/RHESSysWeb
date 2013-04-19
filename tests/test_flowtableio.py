@@ -1,6 +1,6 @@
-"""@package rhessysweb.tests.test_readflowtable
+"""@package tests.test_flowtableio
     
-@brief Test methods for rhessysweb.readflowtable
+@brief Test methods for flowtableio
 
 This software is provided free of charge under the New BSD License. Please see
 the following license information:
@@ -35,7 +35,7 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Usage: 
 @code
-python -m unittest test_readflowtable
+python -m unittest test_flowtableio
 @endcode
 """ 
 import os, errno
@@ -43,10 +43,10 @@ import gzip
 import filecmp
 from unittest import TestCase
 
-from rhessysweb.readflowtable import readFlowtable
-from rhessysweb.readflowtable import writeFlowtable
-from rhessysweb.readflowtable import getReceiversForFlowtableEntry
-from rhessysweb.types import getFQPatchIDFromArray
+from flowtableio import readFlowtable
+from flowtableio import writeFlowtable
+from flowtableio import getReceiversForFlowtableEntry
+from rhessystypes import getFQPatchIDFromArray
 
 
 ## Constants
@@ -57,7 +57,7 @@ class TestReadFlowtable(TestCase):
 
     def setUp(self):
         # We gzip the flow table to be nice to GitHub, unzip it
-        self.flowtablePath = os.path.abspath('./data/dr5_5m_preroof.flow.flow')
+        self.flowtablePath = os.path.abspath('./tests/data/dr5_5m_preroof.flow.flow')
         flowtableGz = "%s.gz" % (self.flowtablePath,)
         if not os.access(flowtableGz, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read flow table %s" %
@@ -123,4 +123,55 @@ class TestReadFlowtable(TestCase):
         self.assertTrue( len(receivers) == 7 )
         self.assertTrue( receivers[0].patchID == 365709 )
         self.assertTrue( abs(receivers[6].gamma - 0.18454391) < ZERO )
+        
+    def testUpdateReceiversForFlowtableEntryWithoutRoad(self):
+        testKeyStr = "328469    145    145"
+        values = testKeyStr.split()
+        testEntry = getFQPatchIDFromArray(values)
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        # Test flow table entry
+        self.assertTrue( items[0].patchID == 328469)
+        
+        numReceivers = len(receivers)
+        newGamma = float(1 / numReceivers)
+        for receiver in receivers:
+            receiver.gamma = newGamma
+
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        for receiver in receivers:
+            self.assertTrue( receiver.gamma == newGamma )
+            
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        # Test flow table entry
+        self.assertTrue( items[0].patchID == 328469)
+        
+    def testUpdateReceiversForFlowtableEntryWithRoad(self):
+        testKeyStr = "366555    145    145"
+        values = testKeyStr.split()
+        testEntry = getFQPatchIDFromArray(values)
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        # Test flow table entry
+        self.assertTrue( items[0].patchID == 366555)
+        
+        numReceivers = len(receivers)
+        newGamma = float(1 / numReceivers)
+        for receiver in receivers:
+            receiver.gamma = newGamma
+        
+        receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        for receiver in receivers:
+            self.assertTrue( receiver.gamma == newGamma )
+            
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        # Test flow table entry
+        self.assertTrue( items[0].patchID == 366555)
+        
 

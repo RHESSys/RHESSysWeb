@@ -1,4 +1,4 @@
-"""@package rhessysweb.grassdatalookup
+"""@package grassdatalookup
 
 @brief Perform lookups against data stored in GRASS GIS datasets 
 
@@ -38,7 +38,7 @@ import tempfile
 from collections import namedtuple
 from ctypes import *
 
-import RHESSysWeb.types
+import rhessystypes
 
 GRASSConfig = namedtuple('GRASSConfig', ['gisbase', 'dbase', 'location', 'mapset'], verbose=False)
 
@@ -129,7 +129,7 @@ def getCoordinatesForFQPatchIDs(fqPatchIDs, grassConfig, patchMap, zoneMap, hill
                     # Match found, get its coordinates
                     easting = grass.G_col_to_easting(col + 0.5, byref(window))
                     northing = grass.G_row_to_northing(row + 0.5, byref(window))
-                    coords.append(RHESSysWeb.types.getCoordinatePair(easting, northing))
+                    coords.append(rhessystypes.getCoordinatePair(easting, northing))
     
     # Clean up
     grass.G_close_cell(patchFd)
