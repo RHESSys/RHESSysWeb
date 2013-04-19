@@ -1,6 +1,6 @@
 before_install:
  - sudo apt-get update -qq
- - sudo apt-get install -qq grass grass-dev
+ - sudo apt-get install -qq grass grass-dev python-gdal
 
 env:
  - GISBASE=/usr/lib/grass64
