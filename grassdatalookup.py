@@ -36,6 +36,7 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os, sys
 import tempfile
 from collections import namedtuple
+from collections import OrderedDict
 from ctypes import *
 import importlib
 
@@ -47,6 +48,14 @@ GRASSConfig = namedtuple('GRASSConfig', ['gisbase', 'dbase', 'location', 'mapset
 
 class GrassDataLookup(object): 
     def __init__(self, grass_scripting=None, grass_lib=None, grass_config=None):
+        """ @brief Constructor for GrassDataLookup
+        
+            @param grass_scripting Previously imported grass.script (GRASS scripting API), 
+            if None, grass.script will be imported
+            @param grass_lib Previously imported grass.lib.gis (low-level GRASS API); if None
+            grass.lib.gis will be imported
+            @param grass_config GRASSConfig instance 
+        """
         self.grass_config = grass_config
         
         if not grass_scripting:
@@ -89,11 +98,11 @@ class GrassDataLookup(object):
             @param zoneMap String representing the name of the zone map 
             @param hillslopeMap String representing the name of the hillslope map
             
-            @return List of rhessysweb.types.CoordinatePair objects
+            @return List of rhessysweb.types.CoordinatePair objects representing the 
+            centroid coordinates for each patch in the input list 
             
-            @todo Handle non-grid patches, return the coordinates of their centroid
         """
-        coords = list()
+        coords = OrderedDict()
         
         # Set up GRASS environment
         self.grass_lowlevel.G_gisinit('')
@@ -160,7 +169,13 @@ class GrassDataLookup(object):
                         # Match found, get its coordinates
                         easting = self.grass_lowlevel.G_col_to_easting(col + 0.5, byref(window))
                         northing = self.grass_lowlevel.G_row_to_northing(row + 0.5, byref(window))
-                        coords.append(rhessystypes.getCoordinatePair(easting, northing))
+                        #coords.append(rhessystypes.getCoordinatePair(easting, northing))
+                        try:
+                            coordList = coords[fqPatchID]
+                        except KeyError:
+                            coords[fqPatchID] = list()
+                            coordList = coords[fqPatchID]
+                        coordList.append(rhessystypes.getCoordinatePair(easting, northing))
         
         # Clean up
         self.grass_lowlevel.G_close_cell(patchFd)
@@ -172,6 +187,32 @@ class GrassDataLookup(object):
         
         os.environ['GIS_LOCK'] = ''
         os.unlink(os.environ['GISRC'])
+        
+        return self._getCentroidCoordinatesForPatches(coords)
+    
+    
+    def _getCentroidCoordinatesForPatches(self, coordDict):
+        """ @brief return a list of patch centroid coordinates for each list of patch sub-cell coordinates 
+            stored in a dictionary.
+            
+            @param coordDict Dictionary mapping fully qualified patch ID to a list of patch sub-cell 
+            coordindates
+            
+            @return List of coordinates representing the centroid of each cell
+        """
+        coords = list()
+        keys = coordDict.keys()
+        for key in keys:
+            coordList = coordDict[key]
+            numCoords = len(coordList)
+            easting = northing = 0.0
+            if numCoords > 0:
+                for c in coordList:
+                    easting += c.easting
+                    northing += c.northing
+                easting = easting / numCoords
+                northing = northing / numCoords
+            coords.append(rhessystypes.getCoordinatePair(easting, northing))
         
         return coords
     

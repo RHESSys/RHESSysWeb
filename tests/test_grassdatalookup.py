@@ -46,8 +46,7 @@ from zipfile import ZipFile
 from unittest import TestCase
 
 import rhessystypes
-from grassdatalookup import getFQPatchIDForCoordinates
-from grassdatalookup import getCoordinatesForFQPatchIDs
+from grassdatalookup import GrassDataLookup
 from grassdatalookup import GRASSConfig
 
 ## Constants
@@ -72,7 +71,8 @@ class TestGRASSDataLookup(TestCase):
         zip.extractall(path=extractDir)
         
         gisbase = os.environ['GISBASE']
-        self.grassMapset = GRASSConfig(gisbase=gisbase, dbase=self.grassDBasePath, location='DR5', mapset='taehee')
+        grassConfig = GRASSConfig(gisbase=gisbase, dbase=self.grassDBasePath, location='DR5', mapset='taehee')
+        self.grassdatalookup = GrassDataLookup(grass_config=grassConfig)
         
         self.inPatchID = 288804
         #self.inPatchID = 289650
@@ -83,6 +83,7 @@ class TestGRASSDataLookup(TestCase):
         self.patchMap = "patch_5m"
         self.zoneMap = "hillslope"
         self.hillslopeMap = "hillslope"
+        
     
     def tearDown(self):
         rmtree(self.grassDBasePath)
@@ -91,7 +92,7 @@ class TestGRASSDataLookup(TestCase):
     def testGetCoordinatesForFQPatchIDs(self):
         fqPatchIDs = [ (rhessystypes.FQPatchID(patchID=self.inPatchID, \
                                                    zoneID=self.inZoneID, hillID=self.inHillID)) ]
-        coords = getCoordinatesForFQPatchIDs(fqPatchIDs, self.grassMapset, self.patchMap, self.zoneMap, self.hillslopeMap)
+        coords = self.grassdatalookup.getCoordinatesForFQPatchIDs(fqPatchIDs, self.patchMap, self.zoneMap, self.hillslopeMap)
         self.assertTrue( len(coords) == 1 )
         coordPair = coords[0]
         self.assertTrue( abs(coordPair.easting - self.easting) < ZERO )
@@ -100,7 +101,7 @@ class TestGRASSDataLookup(TestCase):
     def testGetFQPatchIDForCoordinates(self):
         coordinate = rhessystypes.getCoordinatePair(self.easting, self.northing)
         (patchID, zoneID, hillID) = \
-            getFQPatchIDForCoordinates(coordinate, self.grassMapset, \
+            self.grassdatalookup.getFQPatchIDForCoordinates(coordinate, \
                                        self.patchMap, self.zoneMap, self.hillslopeMap)
         self.assertTrue( self.inPatchID == patchID )
         self.assertTrue( self.inZoneID == zoneID )
