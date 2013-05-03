@@ -163,7 +163,8 @@ def readFlowtable(flowtable):
         numLines += 1
         line = line.strip()
         values = line.split()
-        if len(values) == FLOW_ENTRY_NUM_TOKENS:
+        lv = len(values)
+        if lv == FLOW_ENTRY_NUM_TOKENS:
             # Check for error in flow table structure
             if readReceivers and numRead < numAdj:
                 raise Exception("Error in flow table at line %d, only %d of %d adjacent recievers read" % (numLines, numRead, numAdj))
@@ -171,13 +172,12 @@ def readFlowtable(flowtable):
             # FlowDict uses a FlowTableKey as reference, adds newEntry and items as entries
             newEntry = getFlowTableEntryFromArray(values)
             newKey = rhessystypes.FQPatchID(patchID=newEntry.patchID, zoneID=newEntry.zoneID, hillID=newEntry.hillID)
-            flowDict[newKey] = list()
-            flowDict[newKey].append(newEntry)
+            flowDict[newKey] = [newEntry]
             readReceivers = True
             numRead = 0
             numAdj = int(newEntry.numAdjacent)
             currEntry = newKey
-        elif len(values) == FLOW_ENTRY_ITEM_NUM_TOKENS and readReceivers:
+        elif lv == FLOW_ENTRY_ITEM_NUM_TOKENS and readReceivers:
             # Check for error in flow table structure
             if numRead > numAdj:
                 raise Exception("Error in flow table at line %d, already read %d of %d adjacent" % (numLines, numRead, numAdj))
