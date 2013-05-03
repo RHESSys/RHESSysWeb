@@ -94,7 +94,8 @@ class TestGRASSDataLookup(TestCase):
                                                    zoneID=self.inZoneID, hillID=self.inHillID)) ]
         coords = self.grassdatalookup.getCoordinatesForFQPatchIDs(fqPatchIDs, self.patchMap, self.zoneMap, self.hillslopeMap)
         self.assertTrue( len(coords) == 1 )
-        coordPair = coords[0]
+        keys = coords.keys()
+        coordPair = coords[keys[0]][0]
         self.assertTrue( abs(coordPair.easting - self.easting) < ZERO )
         self.assertTrue( abs(coordPair.northing - self.northing) < ZERO )
     

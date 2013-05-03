@@ -98,8 +98,8 @@ class GrassDataLookup(object):
             @param zoneMap String representing the name of the zone map 
             @param hillslopeMap String representing the name of the hillslope map
             
-            @return List of rhessysweb.types.CoordinatePair objects representing the 
-            centroid coordinates for each patch in the input list 
+            @return Dict mapping rhessystypes.FQPatchID to the list of rhessysweb.types.CoordinatePair 
+            objects representing the raster pixels that make up each patch in the input list 
             
         """
         coords = OrderedDict()
@@ -188,7 +188,7 @@ class GrassDataLookup(object):
         os.environ['GIS_LOCK'] = ''
         os.unlink(os.environ['GISRC'])
         
-        return self._getCentroidCoordinatesForPatches(coords)
+        return coords
     
     
     def _getCentroidCoordinatesForPatches(self, coordDict):
