@@ -154,6 +154,7 @@ class GrassDataLookup(object):
         hillFd = self.grass_lowlevel.G_open_cell_old(hillslopeMap, hill) 
         hillRast = self.grass_lowlevel.G_allocate_raster_buf(hillType)     
         hillRast = cast(c_void_p(hillRast), ptype) 
+#        print( "getCoordinatesForFQPatchIDs: patchIDs: %s" % (fqPatchIDs,) )
          
         for row in range(numRows):
             # Get current row for each dataset
@@ -169,13 +170,14 @@ class GrassDataLookup(object):
                         # Match found, get its coordinates
                         easting = self.grass_lowlevel.G_col_to_easting(col + 0.5, byref(window))
                         northing = self.grass_lowlevel.G_row_to_northing(row + 0.5, byref(window))
-                        #coords.append(rhessystypes.getCoordinatePair(easting, northing))
                         try:
                             coordList = coords[fqPatchID]
                         except KeyError:
-                            coords[fqPatchID] = list()
-                            coordList = coords[fqPatchID]
+                            coordList = []
+                            coords[fqPatchID] = coordList
                         coordList.append(rhessystypes.getCoordinatePair(easting, northing))
+#                        print( "row: %d, col: %d; patch: %d, %d, %d; coordList: %s" % \
+#                               (row, col, fqPatchID.patchID, fqPatchID.zoneID, fqPatchID.hillID, coordList) )
         
         # Clean up
         self.grass_lowlevel.G_close_cell(patchFd)
@@ -185,8 +187,8 @@ class GrassDataLookup(object):
         self.grass_lowlevel.G_close_cell(hillFd)
         self.grass_lowlevel.G_free(hillRast)
         
-        os.environ['GIS_LOCK'] = ''
-        os.unlink(os.environ['GISRC'])
+#        os.environ['GIS_LOCK'] = ''
+#        os.unlink(os.environ['GISRC'])
         
         return coords
     
@@ -259,8 +261,8 @@ class GrassDataLookup(object):
         hillID = self._getValueForCell(hillslopeMap, row, col)
         #print("HillID: %d\n" % (hillID,) )
         
-        os.environ['GIS_LOCK'] = ''
-        os.unlink(os.environ['GISRC'])
+#        os.environ['GIS_LOCK'] = ''
+#        os.unlink(os.environ['GISRC'])
         
         return rhessystypes.FQPatchID(patchID=int(patchID), zoneID=int(zoneID), hillID=int(hillID))
     

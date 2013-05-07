@@ -50,15 +50,16 @@ from grassdatalookup import GrassDataLookup
 from grassdatalookup import GRASSConfig
 
 ## Constants
-ZERO = 3
+ZERO = 4.999
 
 ## Unit tests
 class TestGRASSDataLookup(TestCase):
     
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         # We zip the GRASSData folder to be nice to GitHub, unzip it
-        self.grassDBasePath = os.path.abspath('./tests/data/GRASSData')
-        grassDBaseZip = "%s.zip" % (self.grassDBasePath,)
+        cls.grassDBasePath = os.path.abspath('./tests/data/GRASSData')
+        grassDBaseZip = "%s.zip" % (cls.grassDBasePath,)
         if not os.access(grassDBaseZip, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read GRASS data zip %s" %
                       grassDBaseZip)
@@ -67,26 +68,26 @@ class TestGRASSDataLookup(TestCase):
             raise IOError(errno.EACCES, "Unable to write to GRASS data parent dir %s" %
                           grassDBaseDir)
         zip = ZipFile(grassDBaseZip, 'r')
-        extractDir = os.path.split(self.grassDBasePath)[0]
+        extractDir = os.path.split(cls.grassDBasePath)[0]
         zip.extractall(path=extractDir)
         
         gisbase = os.environ['GISBASE']
-        grassConfig = GRASSConfig(gisbase=gisbase, dbase=self.grassDBasePath, location='DR5', mapset='taehee')
-        self.grassdatalookup = GrassDataLookup(grass_config=grassConfig)
+        grassConfig = GRASSConfig(gisbase=gisbase, dbase=cls.grassDBasePath, location='DR5_5m', mapset='taehee')
+        cls.grassdatalookup = GrassDataLookup(grass_config=grassConfig)
         
-        self.inPatchID = 288804
-        #self.inPatchID = 289650
-        self.inZoneID = 145
-        self.inHillID = 145
-        self.easting = 349100.0
-        self.northing = 4350470.0
-        self.patchMap = "patch_5m"
-        self.zoneMap = "hillslope"
-        self.hillslopeMap = "hillslope"
+        cls.inPatchID = 309999
+        cls.inZoneID = 73
+        cls.inHillID = 73
+        cls.easting = 349325.089515
+        cls.northing = 4350341.816966
+        cls.patchMap = "patch_5m"
+        cls.zoneMap = "hillslope"
+        cls.hillslopeMap = "hillslope"
         
     
-    def tearDown(self):
-        rmtree(self.grassDBasePath)
+    @classmethod
+    def tearDownClass(cls):
+        rmtree(cls.grassDBasePath)
    
    
     def testGetCoordinatesForFQPatchIDs(self):
@@ -98,9 +99,19 @@ class TestGRASSDataLookup(TestCase):
         coordPair = coords[keys[0]][0]
         self.assertTrue( abs(coordPair.easting - self.easting) < ZERO )
         self.assertTrue( abs(coordPair.northing - self.northing) < ZERO )
+        
     
     def testGetFQPatchIDForCoordinates(self):
-        coordinate = rhessystypes.getCoordinatePair(self.easting, self.northing)
+        fqPatchIDs = [ (rhessystypes.FQPatchID(patchID=self.inPatchID, \
+                                                   zoneID=self.inZoneID, hillID=self.inHillID)) ]
+        coords = self.grassdatalookup.getCoordinatesForFQPatchIDs(fqPatchIDs, self.patchMap, self.zoneMap, self.hillslopeMap)
+        self.assertTrue( len(coords) == 1 )
+        keys = coords.keys()
+        coordPair = coords[keys[0]][0]
+        self.assertTrue( abs(coordPair.easting - self.easting) < ZERO )
+        self.assertTrue( abs(coordPair.northing - self.northing) < ZERO )
+        
+        coordinate = rhessystypes.getCoordinatePair(coordPair.easting, coordPair.northing)
         (patchID, zoneID, hillID) = \
             self.grassdatalookup.getFQPatchIDForCoordinates(coordinate, \
                                        self.patchMap, self.zoneMap, self.hillslopeMap)

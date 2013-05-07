@@ -39,14 +39,20 @@ python -m unittest test_flowtableio
 @endcode
 """ 
 import os, errno
+import sys
 import gzip
 import filecmp
+from shutil import rmtree
+from zipfile import ZipFile
 from unittest import TestCase
 
 from flowtableio import readFlowtable
 from flowtableio import writeFlowtable
 from flowtableio import getReceiversForFlowtableEntry
-from rhessystypes import getFQPatchIDFromArray
+import rhessystypes
+
+from grassdatalookup import GrassDataLookup
+from grassdatalookup import GRASSConfig
 
 
 ## Constants
@@ -55,29 +61,55 @@ ZERO = 0.001
 ## Unit tests
 class TestReadFlowtable(TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         # We gzip the flow table to be nice to GitHub, unzip it
-        self.flowtablePath = os.path.abspath('./tests/data/dr5_5m_preroof.flow.flow')
-        flowtableGz = "%s.gz" % (self.flowtablePath,)
+        cls.flowtablePath = os.path.abspath('./tests/data/world5m_dr5.flow')
+        flowtableGz = "%s.gz" % (cls.flowtablePath,)
         if not os.access(flowtableGz, os.R_OK):
             raise IOError(errno.EACCES, "Unable to read flow table %s" %
                       flowtableGz)
-        self.flowtableDir = os.path.split(flowtableGz)[0]
-        if not os.access(self.flowtableDir, os.W_OK):
+        cls.flowtableDir = os.path.split(flowtableGz)[0]
+        if not os.access(cls.flowtableDir, os.W_OK):
             raise IOError(errno.EACCES, "Unable to write to flow table dir %s" %
-                          self.flowtableDir)
+                          cls.flowtableDir)
         fIn = gzip.open(flowtableGz, 'rb')
-        fOut = open(self.flowtablePath, 'wb')
+        fOut = open(cls.flowtablePath, 'wb')
         fOut.write(fIn.read())
         fIn.close()
         fOut.close()
+        
+        # We zip the GRASSData folder to be nice to GitHub, unzip it
+        cls.grassDBasePath = os.path.abspath('./tests/data/GRASSData')
+        grassDBaseZip = "%s.zip" % (cls.grassDBasePath,)
+        if not os.access(grassDBaseZip, os.R_OK):
+            raise IOError(errno.EACCES, "Unable to read GRASS data zip %s" %
+                      grassDBaseZip)
+        grassDBaseDir = os.path.split(grassDBaseZip)[0]
+        if not os.access(grassDBaseDir, os.W_OK):
+            raise IOError(errno.EACCES, "Unable to write to GRASS data parent dir %s" %
+                          grassDBaseDir)
+        zip = ZipFile(grassDBaseZip, 'r')
+        extractDir = os.path.split(cls.grassDBasePath)[0]
+        zip.extractall(path=extractDir)
+        
+        gisbase = os.environ['GISBASE']
+        grassConfig = GRASSConfig(gisbase=gisbase, dbase=cls.grassDBasePath, location='DR5_5m', mapset='taehee')
+        cls.grassdatalookup = GrassDataLookup(grass_config=grassConfig)
+        
+        cls.patchMap = "patch_5m"
+        cls.zoneMap = "hillslope"
+        cls.hillslopeMap = "hillslope"
          
         # Build the flow table
-        self.flowtable = readFlowtable(self.flowtablePath)
+        cls.flowtable = readFlowtable(cls.flowtablePath)
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         # Get rid of the un-gzipped flow table
-        os.unlink(self.flowtablePath)
+        os.unlink(cls.flowtablePath)
+        # Get rid of unzipped GRASSData
+        rmtree(cls.grassDBasePath)
 
     def testReadWriteFlowtable(self):
         testOutpath = os.path.join(self.flowtableDir, "test-flow.flow")
@@ -86,54 +118,55 @@ class TestReadFlowtable(TestCase):
         os.unlink(testOutpath)
 
     def testEntryWithoutRoad(self):
-        testKeyStr = "328469    145    145"
+        testKeyStr = "324225     67     67"
         values = testKeyStr.split()
-        testEntry = getFQPatchIDFromArray(values)
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 9 )
-        self.assertTrue( items[0].patchID == 328469)
-        self.assertTrue( items[1].patchID == 327622 )
-        self.assertTrue( abs(items[8].gamma - 0.27929801) < ZERO )
+        self.assertTrue( items[0].patchID == 324225 )
+        self.assertTrue( items[1].patchID == 323378 )
+        self.assertTrue( abs(items[1].gamma - 0.00187500 ) < ZERO )
         
     def testEntryWithRoad(self):
-        testKeyStr = "366555    145    145"
+        testKeyStr = "367400     67     67"
         values = testKeyStr.split()
-        testEntry = getFQPatchIDFromArray(values)
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
         items = self.flowtable[testEntry]
-        self.assertTrue( len(items) == 9)
-        self.assertTrue( items[0].patchID == 366555)
-        self.assertTrue( items[1].patchID == 365709 )
-        self.assertTrue( abs(items[7].gamma - 0.18454391) < ZERO )
-        self.assertTrue( abs(items[8].roadWidth - 5.0) < ZERO )
+        self.assertTrue( len(items) == 10)
+        self.assertTrue( items[0].patchID == 367400 )
+        self.assertTrue( items[1].patchID == 366553 )
+        self.assertTrue( items[8].patchID == 368247 )
+        self.assertTrue( abs(items[8].gamma - 0.53678352 ) < ZERO )
+        self.assertTrue( abs(items[9].roadWidth - 5.0) < ZERO )
     
     def testGetReceiversForFlowtableEntryWithoutRoad(self):
-        testKeyStr = "328469    145    145"
+        testKeyStr = "324225     67     67"
         values = testKeyStr.split()
-        testEntry = getFQPatchIDFromArray(values)
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
         receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
         self.assertTrue( len(receivers) == 8 )
-        self.assertTrue( receivers[0].patchID == 327622 )
-        self.assertTrue( abs(receivers[7].gamma - 0.27929801) < ZERO )
+        self.assertTrue( receivers[0].patchID == 323378 )
+        self.assertTrue( abs(receivers[7].gamma - 0.00000000) < ZERO )
         
     def testGetReceiversForFlowtableEntryWithRoad(self):
-        testKeyStr = "366555    145    145"
+        testKeyStr = "367400     67     67"
         values = testKeyStr.split()
-        testEntry = getFQPatchIDFromArray(values)
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
         receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
-        self.assertTrue( len(receivers) == 7 )
-        self.assertTrue( receivers[0].patchID == 365709 )
-        self.assertTrue( abs(receivers[6].gamma - 0.18454391) < ZERO )
+        self.assertTrue( len(receivers) == 8 )
+        self.assertTrue( receivers[0].patchID == 366553 )
+        self.assertTrue( abs(receivers[7].gamma - 0.53678352) < ZERO )
         
     def testUpdateReceiversForFlowtableEntryWithoutRoad(self):
-        testKeyStr = "328469    145    145"
+        testKeyStr = "324225     67     67"
         values = testKeyStr.split()
-        testEntry = getFQPatchIDFromArray(values)
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
         receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
         
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 9 )
         # Test flow table entry
-        self.assertTrue( items[0].patchID == 328469)
+        self.assertTrue( items[0].patchID == 324225)
         
         numReceivers = len(receivers)
         newGamma = float(1 / numReceivers)
@@ -147,18 +180,18 @@ class TestReadFlowtable(TestCase):
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 9 )
         # Test flow table entry
-        self.assertTrue( items[0].patchID == 328469)
+        self.assertTrue( items[0].patchID == 324225)
         
     def testUpdateReceiversForFlowtableEntryWithRoad(self):
-        testKeyStr = "366555    145    145"
+        testKeyStr = "367400     67     67"
         values = testKeyStr.split()
-        testEntry = getFQPatchIDFromArray(values)
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
         receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
         
         items = self.flowtable[testEntry] 
-        self.assertTrue( len(items) == 9 )
+        self.assertTrue( len(items) == 10 )
         # Test flow table entry
-        self.assertTrue( items[0].patchID == 366555)
+        self.assertTrue( items[0].patchID == 367400)
         
         numReceivers = len(receivers)
         newGamma = float(1 / numReceivers)
@@ -170,8 +203,21 @@ class TestReadFlowtable(TestCase):
             self.assertTrue( receiver.gamma == newGamma )
             
         items = self.flowtable[testEntry] 
-        self.assertTrue( len(items) == 9 )
+        self.assertTrue( len(items) == 10 )
         # Test flow table entry
-        self.assertTrue( items[0].patchID == 366555)
+        self.assertTrue( items[0].patchID == 367400)
         
-
+    def testSpecificPatchReceiverCoordinateLookupWithoutRoad(self):
+        testKeyStr = "324225     67     67"
+        values = testKeyStr.split()
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
+        items = self.flowtable[testEntry] 
+        self.assertTrue( len(items) == 9 )
+        
+        recv = getReceiversForFlowtableEntry(testEntry, self.flowtable)
+        self.assertTrue( len(recv) == 8 )
+        
+        coords = self.grassdatalookup.getCoordinatesForFQPatchIDs(recv, self.patchMap, self.zoneMap, self.hillslopeMap)
+        keys = coords.keys()
+        for key in keys:
+            self.assertTrue( len(coords[key]) == 1 )
