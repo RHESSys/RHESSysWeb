@@ -7,12 +7,14 @@ import os
 import sh
 
 import tempfile
+from RHESSysWeb.grassdatalookup import GrassDataLookup
 
 class Grass(drivers.Driver):
     def __init__(self, resource):
         super(Grass, self).__init__(data_resource=resource)
         self.env = self.resource.parent.grassenvironment
         self.ensure_grass()
+        self._grassdatalookup = GrassDataLookup(self.g, self.grass_lowlevel)
 
     def ensure_grass(self):
         if 'GISRC' not in os.environ:
@@ -32,7 +34,9 @@ class Grass(drivers.Driver):
         if not hasattr(self, '_gsetup'):
             self._gsetup = importlib.import_module('grass.script.setup')
             self.g = importlib.import_module("grass.script")
+            self.grass_lowlevel = importlib.import_module('grass.lib.gis')
 
+        self.grass_lowlevel.G_gisinit('')
         self._gsetup.init(settings.GISBASE, self.env.database, self.env.location, self.env.map_set)
 
     def _initializeGrassrc(self):
@@ -104,7 +108,7 @@ class Grass(drivers.Driver):
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
 
-        from RHESSysWeb import grassdatalookup, flowtableio, rhessystypes
+        from RHESSysWeb import flowtableio, rhessystypes
 
         patch = int(patch)
         hillslope = int(hillslope)
@@ -117,12 +121,9 @@ class Grass(drivers.Driver):
 
         receivers = [fqpatch_id] + flowtableio.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
 
-        coords = grassdatalookup.getCoordinatesForFQPatchIDs(
+        coords = self._grassdatalookup.getCoordinatesForFQPatchIDs(
             receivers,
-            grassdatalookup.GRASSConfig(gisbase=settings.GISBASE, dbase=self.env.database, location=self.env.location, mapset=self.env.map_set),
             'patch_5m','hillslope','hillslope')
-
-        print len(coords)
 
         xrc = osr.CoordinateTransformation(self.proj, r_srs)
         self.ensure_grass()
@@ -137,18 +138,24 @@ class Grass(drivers.Driver):
                 except:
                     return k
 
-        coords = [{
+        c = []
+        for fqpatchid, pairs in coords.items():
+            for a in pairs:
+                c.append({
+
                       "type" : "Feature",
                       "geometry" : { "type" : "Point", "coordinates" : xrc.TransformPoint(a.easting, a.northing)[0:2] },
                       "properties" : dict(zip(
                           rasters,
                           [best_type(k) for k in self.g.read_command('r.what', input=rasters, east_north='{e},{n}'.format(e=a.easting, n=a.northing)).strip().split('|')]
                       ))
-                  } for a in coords]
-
+                })
+                c[-1]['properties']['fqpatchid'] = [fqpatchid.patchID, fqpatchid.zoneID, fqpatchid.hillID]
+        print len(c), len(coords), len(receivers), coords.keys()
+        
         return {
             "type" : "FeatureCollection",
-            "features" : coords
+            "features" : c
         }
 
         ### everything above here is specific to rhessys and the hackathon ###
@@ -165,16 +172,14 @@ class Grass(drivers.Driver):
     def compute_fields(self, **kwargs):
 
         r = self.region
-        proj =  self.proj
+        s_srs =  self.proj
 
-        s_srs = osr.SpatialReference()
         e4326 = osr.SpatialReference()
         e4326.ImportFromEPSG(4326)
-        s_srs.ImportFromProj4(proj)
         crx = osr.CoordinateTransformation(s_srs, e4326)
 
         x0, y0, x1, y1 = r['w'], r['s'], r['e'], r['n']
-        self.resource.spatial_metadata.native_srs = proj
+        self.resource.spatial_metadata.native_srs = s_srs
 
         xx0, yy0, _ = crx.TransformPoint(r['w'], r['s'])
         xx1, yy1, _ = crx.TransformPoint(r['e'], r['n'])
@@ -212,12 +217,8 @@ class Grass(drivers.Driver):
             self.resource.slug,
             e3857.ExportToProj4(),
             {
-                "type" : "raster",
+                "type" : "gdal",
                 "file" : cached_tiff,
-                "lox" : str(xx0),
-                "loy" : str(yy0),
-                "hix" : str(xx1),
-                "hiy" : str(yy1)
             }
         )
 
