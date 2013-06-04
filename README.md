@@ -3,6 +3,20 @@ RHESSysWeb
 
 Web tool for developing and manipulating RHESSys input datasets
 
+Installation - Geoanalytics framework
+-------------------------------------
+First install the Geoanalytics framework as described in
+JeffHeard/ga_cms (hosted on GitHub)
+
+Installation - RHESSysWeb
+-------------------------
+### Clone from github into ga-cms directory
+git clone https://github.com/RHESSys/RHESSysWeb.git
+
+### Edit ga-cms/settings.py, adding RHESSysWeb to INSTALLED_APPS listing
+
+
+
 Tests
 -----
 
