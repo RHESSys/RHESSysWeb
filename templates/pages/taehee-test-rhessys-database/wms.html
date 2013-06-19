@@ -38,6 +38,13 @@
     </tr>
     </tfoot>
     </table>
+    <div class="row" id="alerts">
+        <div class="alert" id='validation-alert' style='display:none'>
+            <button class="close" data-dismiss="alert">&times;</button>
+            <strong>Flows must sum to 1.0</strong>
+        </div>
+    </div>
+
 
 
 {% endblock %}
@@ -68,9 +75,24 @@
 
     <script type="text/javascript">
         $(function() {
-            var Patch = Backbone.Model.extend({ defaults : {patchId: 0, zoneId: 0, hillId: 0, gamma:0, total_gamma: 0}});
+            var Patch = Backbone.Model.extend({
+                defaults : {patchId: 0, zoneId: 0, hillId: 0, gamma:0, total_gamma: 0},
+                validate : function(attrs, options) { }
+            });
+
             var PatchCollection = Backbone.Collection.extend({model:Patch});
             var patchCollection = new PatchCollection();
+
+            // val gammaSum = patchCollection.reduce(function(memo, patch) { memo += patch.get('gamma') }, 0);
+            //
+            // if(gammaSum != 1.0) {
+            //      $("#validation-alert").alert()
+            // }
+            // else {
+            //      $("#validation-alert").alert('close')
+            // }
+            //
+
 
             var SidebarPatchView = Backbone.Marionette.ItemView.extend({
                 template: "#sidebar-patch-template",
@@ -79,7 +101,6 @@
 
             var donor = new Patch({});
             var DonorView = Backbone.Marionette.ItemView.extend({
-                el: "#donor",
                 template: "#donor-template",
                 tagName: 'h6'
             });
