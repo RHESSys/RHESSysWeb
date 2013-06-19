@@ -193,6 +193,27 @@ def readFlowtable(flowtable):
     flow.close()   
     return flowDict
 
+def getEntryForFlowtableKey(key, flowtable):
+    """ @brief Get flow table entry for a given flow table key
+    
+        @param key rhessysweb.types.FQPatchID
+        @param flowtable Dict returned by readFlowtable
+    
+        @return FlowTableEntry object, None if the table has no such key
+    """
+    entry = None
+    
+    try:
+        items = flowtable[key]
+        for item in items:
+            if isinstance(item, FlowTableEntry):
+                entry = item
+    except KeyError:
+        pass
+    
+    return entry
+
+
 def getReceiversForFlowtableEntry(key, flowtable):    
     """ @brief Get list of receivers for a given flow table key
     

@@ -49,6 +49,7 @@ from unittest import TestCase
 from flowtableio import readFlowtable
 from flowtableio import writeFlowtable
 from flowtableio import getReceiversForFlowtableEntry
+from flowtableio import getEntryForFlowtableKey
 import rhessystypes
 
 from grassdatalookup import GrassDataLookup
@@ -180,18 +181,29 @@ class TestReadFlowtable(TestCase):
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 9 )
         # Test flow table entry
-        self.assertTrue( items[0].patchID == 324225)
+        self.assertTrue( items[0].patchID == 324225 )
         
+        
+    def testGetTotalGamma(self):
+        testKeyStr = "367400     67     67"
+        values = testKeyStr.split()
+        testEntry = rhessystypes.getFQPatchIDFromArray(values)
+        
+        totalGamma = getEntryForFlowtableKey(testEntry, self.flowtable).totalGamma
+        self.assertTrue( totalGamma == 0.451261 )
+        
+    
     def testUpdateReceiversForFlowtableEntryWithRoad(self):
         testKeyStr = "367400     67     67"
         values = testKeyStr.split()
         testEntry = rhessystypes.getFQPatchIDFromArray(values)
+        
         receivers = getReceiversForFlowtableEntry(testEntry, self.flowtable)
         
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 10 )
         # Test flow table entry
-        self.assertTrue( items[0].patchID == 367400)
+        self.assertTrue( items[0].patchID == 367400 )
         
         numReceivers = len(receivers)
         newGamma = float(1 / numReceivers)
