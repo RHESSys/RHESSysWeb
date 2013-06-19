@@ -119,6 +119,8 @@ class Grass(drivers.Driver):
         if not hasattr(self, 'flow_table'):
             self.flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
 
+        total_gamma = flowtableio.getEntryForFlowtableKey(fqpatch_id, self.flow_table).totalGamma
+
         receivers = [fqpatch_id] + flowtableio.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
 
         coords = self._grassdatalookup.getCoordinatesForFQPatchIDs(
@@ -139,10 +141,9 @@ class Grass(drivers.Driver):
                     return k
 
         c = []
-        for fqpatchid, pairs in coords.items():
+        for i, (fqpatchid, pairs) in enumerate(coords.items()):
             for a in pairs:
                 c.append({
-
                       "type" : "Feature",
                       "geometry" : { "type" : "Point", "coordinates" : xrc.TransformPoint(a.easting, a.northing)[0:2] },
                       "properties" : dict(zip(
@@ -151,6 +152,12 @@ class Grass(drivers.Driver):
                       ))
                 })
                 c[-1]['properties']['fqpatchid'] = [fqpatchid.patchID, fqpatchid.zoneID, fqpatchid.hillID]
+                if hasattr(receivers[i], 'gamma'):
+                    c[-1]['properties']['gamma'] = receivers[i].gamma
+                else:
+                    c[-1]['properties']['total_gamma'] = total_gamma
+
+
         print len(c), len(coords), len(receivers), coords.keys()
         
         return {
@@ -189,7 +196,6 @@ class Grass(drivers.Driver):
         self.resource.spatial_metadata.save()
 
     def ready_data_resource(self, **kwargs):
-
         r = self.region
         s_srs =  self.proj
 
@@ -207,7 +213,7 @@ class Grass(drivers.Driver):
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
         if not os.path.exists(cached_tiff):
-            self.g.run_command('r.out.tiff', flags='t', input=raster, output=cached_basename + ".native.tif")
+            self.g.run_command('r.out.gdal', nodata='0', input=raster, output=cached_basename + ".native.tif")
             with open(cached_basename+'.native.prj', 'w') as prj:
                 prj.write(s_srs.ExportToWkt())
 
