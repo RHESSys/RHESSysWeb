@@ -5,9 +5,16 @@ from django.contrib.gis.geos import Polygon
 import importlib
 import os
 import sh
+import redis
+import cPickle
 
 import tempfile
 from RHESSysWeb.grassdatalookup import GrassDataLookup
+from RHESSysWeb import flowtableio
+from RHESSysWeb.rhessystypes import FQPatchID
+from RHESSysWeb.flowtableio import FlowTableEntryReceiver
+
+flowtable = redis.Redis(db=15)
 
 class Grass(drivers.Driver):
     def __init__(self, resource):
@@ -108,20 +115,28 @@ class Grass(drivers.Driver):
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
 
-        from RHESSysWeb import flowtableio, rhessystypes
 
         patch = int(patch)
         hillslope = int(hillslope)
         zone = int(zone)
 
-        fqpatch_id = rhessystypes.FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
+        fqpatch_id = FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
 
-        if not hasattr(self, 'flow_table'):
-            self.flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+        # setup redis if necessary
+        if not flowtable.llen(self.env.flow_table.name):
+            flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+            for fqpatchid, entry in flow_table.items():
+                key = cPickle.dumps(fqpatchid)
+                value = flowtableio.dumpReceivers(entry)
+                flowtable.rpush(self.env.flow_table.name, key)
+                flowtable.hset(self.env.flow_table.name + ".hash", key, value)
 
-        total_gamma = flowtableio.getEntryForFlowtableKey(fqpatch_id, self.flow_table).totalGamma
+        # total_gamma = flowtableio.getEntryForFlowtableKey(fqpatch_id, self.flow_table).totalGamma
+        hkey = cPickle.dumps(fqpatch_id)
+        flowtable_entry = flowtableio.loadReceivers(flowtable.hget(self.env.flow_table.name + ".hash", hkey))
+        total_gamma = flowtable_entry[0].totalGamma
 
-        receivers = [fqpatch_id] + flowtableio.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
+        receivers = [fqpatch_id] + flowtable_entry[1:]
 
         coords = self._grassdatalookup.getCoordinatesForFQPatchIDs(
             receivers,
@@ -158,7 +173,6 @@ class Grass(drivers.Driver):
                     c[-1]['properties']['total_gamma'] = total_gamma
 
 
-        print len(c), len(coords), len(receivers), coords.keys()
         
         return {
             "type" : "FeatureCollection",
@@ -212,12 +226,13 @@ class Grass(drivers.Driver):
         raster = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
-        if not os.path.exists(cached_tiff):
-            self.g.run_command('r.out.gdal', nodata='0', input=raster, output=cached_basename + ".native.tif")
+        if True or not os.path.exists(cached_tiff):
+            self.g.run_command('r.null', map=raster, null=255)
+            self.g.run_command('r.out.gdal', nodata=255, type='UInt16', input=raster, output=cached_basename + ".native.tif")
             with open(cached_basename+'.native.prj', 'w') as prj:
                 prj.write(s_srs.ExportToWkt())
 
-            sh.gdalwarp("-s_srs", cached_basename + '.native.prj', "-t_srs", "EPSG:3857", cached_basename + '.native.tif', cached_tiff)
+            sh.gdalwarp("-s_srs", cached_basename + '.native.prj', "-t_srs", "EPSG:3857", cached_basename + '.native.tif', cached_tiff, '-dstalpha')
 
         return self.cache_path, (
             self.resource.slug,

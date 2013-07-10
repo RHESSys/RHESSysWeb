@@ -3,3 +3,4 @@ from RHESSysWeb import models
 from django.contrib import admin
 
 admin.site.register(models.GrassEnvironment, PageAdmin)
+admin.site.register(models.FlowTable, PageAdmin)

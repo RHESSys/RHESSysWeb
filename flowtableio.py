@@ -43,6 +43,7 @@ import os, sys, errno
 from collections import namedtuple
 from collections import OrderedDict
 import argparse
+import cPickle
 
 import rhessystypes
 
@@ -87,6 +88,53 @@ class FlowTableEntryReceiver:
         self.gamma = float(gamma)
    
 FlowTableEntryRoad = namedtuple('FlowTableEntryReceiver', ['streamPatchID', 'streamZoneID', 'streamHillID', 'roadWidth'], verbose=False) 
+
+import json
+def dumpReceivers(thing):
+    x = []
+    for t in thing:
+            if hasattr(t, "roadWidth"):
+                x.append({
+                    'streamPatchID' : t.streamPatchID,
+                    'streamZoneID' : t.streamZoneID,
+                    'streamHillID' : t.streamHillID,
+                    'roadWidth' : t.roadWidth
+                })
+            elif hasattr(t, "gamma"):
+                x.append({
+                    'patchID' : t.patchID,
+                    'zoneID' : t.zoneID,
+                    'hillID' : t.hillID,
+                    'gamma' : t.gamma
+                })
+            else:
+                x.append({
+                    'patchID' : t.patchID,
+                    'zoneID' : t.zoneID,
+                    'hillID' : t.hillID,
+                    'x' : t.x,
+                    'y' : t.y,
+                    'z' : t.z,
+                    'accumArea' : t.accumArea,
+                    'area' : t.area,
+                    'landType' : t.landType,
+                    'totalGamma' : t.totalGamma,
+                    'numAdjacent' : t.numAdjacent
+                })
+    return json.dumps(x)
+        
+
+def loadReceivers(thing):
+    val = json.loads(thing)
+    x = []
+    for t in val:
+            if 'gamma' in t:
+                x.append(FlowTableEntryReceiver(**t))
+            elif 'roadWidth' in t:
+                x.append(FlowTableEntryRoad(**t))
+            else:
+                x.append(FlowTableEntry(**t))
+    return x
 
 def getFlowTableEntryRoadFromArray(values):
     """ @brief Build a FlowTableEntryRoad from an array
