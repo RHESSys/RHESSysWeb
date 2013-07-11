@@ -227,12 +227,13 @@ class Grass(drivers.Driver):
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
         if True or not os.path.exists(cached_tiff):
-            self.g.run_command('r.null', map=raster, null=255)
-            self.g.run_command('r.out.gdal', nodata=255, type='UInt16', input=raster, output=cached_basename + ".native.tif")
+            #self.g.run_command('r.null', map=raster, null=255)
+            self.g.run_command('r.out.gdal', flags='f', type='UInt16', input=raster, output=cached_basename + ".native.tif")
+            #self.g.run_command('r.out.tiff', input=raster, output=cached_basename + ".native.tif")
             with open(cached_basename+'.native.prj', 'w') as prj:
                 prj.write(s_srs.ExportToWkt())
 
-            sh.gdalwarp("-s_srs", cached_basename + '.native.prj', "-t_srs", "EPSG:3857", cached_basename + '.native.tif', cached_tiff, '-dstalpha')
+            sh.gdalwarp("-s_srs", cached_basename + '.native.prj', "-t_srs", "EPSG:3857", cached_basename + '.native.tif', cached_tiff, '-srcnodata', '65535', '-dstalpha')
 
         return self.cache_path, (
             self.resource.slug,
