@@ -227,6 +227,8 @@ class Grass(drivers.Driver):
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
         if not os.path.exists(cached_tiff):
+            # Remove GRASS mask if present
+            self.g.run_command('r.mask', flags='r')
             output = cached_basename + '.native.tif'
             output_prj = cached_basename+ '.native.prj'
             # TODO: Dynamically set name of mask layer 
