@@ -187,13 +187,13 @@
                         if(patch.get('gamma') === 0) {
                             return "#EDF8FB";
                         }
-                        else if(patch.get('gamma') < 0.25) {
+                        else if(patch.get('gamma') < 0.125) {
                             return "#B2E2E2";
                         }
-                        else if(patch.get('gamma') < 0.5) {
+                        else if(patch.get('gamma') < 0.375) {
                             return "#66C2A4";
                         }
-                        else if(patch.get('gamma') < 0.75) {
+                        else if(patch.get('gamma') < 0.5) {
                             return "#2CA25F";
                         }
                         else {
@@ -205,7 +205,7 @@
                     }
                 },
                 getStrokeWidth : function(feature) {
-                    return 1;
+                    return (map.getZoom() > 13) ? 1 : 0.3;
                 },
                 getPointRadius : function(feature) {
                     var patch = patchCollection.find(function(f) {
@@ -213,25 +213,19 @@
                                f.get('zoneId') == feature.attributes.fqpatchid[1] &&
                                f.get('hillId') == feature.attributes.fqpatchid[2]
                     });
+                    var k = 0.5+(5/map.resolution)/2; // assumes a 5m resolution on the patches.
+                        k = k>0 ? k : 0;
+
                     if(patch) {
-                        if(patch.get('gamma') === 0) {
-                            return 3;
+                        if(feature.attributes.gamma === 0) {
+                            return k/2>2?2:k/2;
                         }
-                        else if(patch.get('gamma') < 0.25) {
-                            return 4;
-                        }
-                        else if(patch.get('gamma') < 0.5) {
-                            return 5;
-                        }
-                        else if(patch.get('gamma') < 0.75) {
-                            return 6;
-                        }
-                        else {
-                            return 7;
+                        else { // if(patch.get('gamma') < 0.125) {
+                            return k; //3+k*2;
                         }
                     }
                     else {
-                        return 7;
+                        return k;
                     }
                 },
                 getStrokeOpacity : function(feature) {
@@ -241,10 +235,14 @@
                     return 1.0;
                 },
                 getLabel : function(feature) {
-                    if(map.getZoom() > 11 && feature.attributes.total_gamma)
-                    return feature.attributes.fqpatchid[0].toString();
-                    else
-                    return"";
+                    if(map.getZoom() > 18) {
+                        if(feature.attributes.total_gamma)
+                            return "";
+                        else {
+                            return feature.attributes.gamma > 0 ? (feature.attributes.gamma * 100).toFixed(0) : "";
+                        }
+                    }
+                    else return "";
                 },
                 getIcon : function(feature) {
                     var patch = patchCollection.find(function(f) {
@@ -253,16 +251,16 @@
                                f.get('hillId') == feature.attributes.fqpatchid[2]
                     });
                     if(patch) {
-                        if(patch.get('gamma') === 0) {
-                            return "square";
+                        if(feature.attributes.gamma === 0) {
+                            return "x";
                         }
 
                         else {
-                            return "circle";
+                            return "square";
                         }
                     }
                     else {
-                        return "circle";
+                        return "star";
                     }
                 }
             };
@@ -276,14 +274,14 @@
                     fillOpacity : "${getFillOpacity}",
                     graphicName : "${getIcon}",
                     label : "${getLabel}",
-                    fontColor : "#000000",
+                    fontColor : "#000",
                     fontWeight: "bold",
-                    fontSize : "12px",
+                    fontSize : "10px",
                     fontFamily : "Helvetica, DejaVu Sans, Arial, sans-serif",
-                    labelAlign : "lm",
-                    labelXOffset: "${getPointRadius}",
-                    labelYOffset: 1,
-                    labelOutlineColor: "#ffffe0",
+                    labelAlign : "mm",
+                    labelXOffset: 0,
+                    labelYOffset: 0,
+                    labelOutlineColor: "#ffffff",
                     labelOutlineWidth: 2,
                     labelOutlineOpacity: 0.8
                 },
