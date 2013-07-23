@@ -71,11 +71,8 @@
         <td>
             <button class="btn btn-block btn-danger" id="revert-flowtable">Revert</button>
         </td>
-        <td>
-            <button class="btn btn-block btn-primary" data-toggle='button' id="inspect-patch">Inspect patch</button>
-        </td>
-        <td>
-            <button class="btn btn-block btn-primary" data-toggle='button' id="add-receiver">Add Receiver</button>
+        <td colspan="2">
+            <button class="btn btn-block btn-primary" id="add-receiver">Add Receiver</button>
         </td>
     </script>
 
@@ -94,14 +91,12 @@
                 template: "#sidebar-patch-template",
                 tagName: "tr", 
                 ui: {
-                   gamma : ".gamma",
-                   remove : ""
+                   gamma : ".gamma"
                 },
                 onRender: function() {
-                   var me = this;
                    this.ui.gamma.change(function() { 
                       console.log('gamma changed');
-                      me.model.set('gamma', parseFloat(me.ui.gamma.val()));
+                      this.model.set('gamma', parseFloat(this.ui.gamma.val())); 
                    });
                 }
             });
@@ -118,7 +113,6 @@
                 ui: {
                     commit : "#save-flowtable",
                     revert : "#revert-flowtable",
-                    inspectPatch : "#inspect-patch",
                     addReceiver : "#add-receiver"
                 },
                 onRender: function() {
@@ -129,17 +123,9 @@
                     this.ui.revert.click(function() { 
                         console.log('revert'); 
                     });
-                    this.ui.inspectPatch.click(function() {
-                       console.log('inspectPatch');
-                        featureinfo.activate();
-                        drawfeature.deactivate();
-                        $("help").html('Click on the map to select a patch and see its receivers');
-                    });
-                    this.ui.addReceiver.click(function() {
-                        featureinfo.deactivate();
-                        drawfeature.activate();
+                    this.ui.addReceiver.click(function() { 
                         console.log('add patch'); 
-                        $("#help").html("Click on the map and the patch you click on will be added to the set of receivers for this entry on the right.");
+                        $("#help").html("Click on the map and the patch you click on will be added to the set of receivers for this entry on the right.")
                     });
                 }
 
@@ -171,129 +157,13 @@
                 raster: 'patch_5m'
             });
 
-
-
-            var styleContext = {
-                getStrokeColor : function(feature) {
-                    return "#ffffff";
-                },
-                getFillColor : function(feature) {
-                    var patch = patchCollection.find(function(f) {
-                        return f.get('patchId') === feature.attributes.fqpatchid[0] &&
-                               f.get('zoneId') == feature.attributes.fqpatchid[1] &&
-                               f.get('hillId') == feature.attributes.fqpatchid[2]
-                    });
-                    if(patch) {
-                        if(patch.get('gamma') === 0) {
-                            return "#EDF8FB";
-                        }
-                        else if(patch.get('gamma') < 0.25) {
-                            return "#B2E2E2";
-                        }
-                        else if(patch.get('gamma') < 0.5) {
-                            return "#66C2A4";
-                        }
-                        else if(patch.get('gamma') < 0.75) {
-                            return "#2CA25F";
-                        }
-                        else {
-                            return "#006D2C";
-                        }
-                    }
-                    else {
-                        return "#B30000";
-                    }
-                },
-                getStrokeWidth : function(feature) {
-                    return 1;
-                },
-                getPointRadius : function(feature) {
-                    var patch = patchCollection.find(function(f) {
-                        return f.get('patchId') === feature.attributes.fqpatchid[0] &&
-                               f.get('zoneId') == feature.attributes.fqpatchid[1] &&
-                               f.get('hillId') == feature.attributes.fqpatchid[2]
-                    });
-                    if(patch) {
-                        if(patch.get('gamma') === 0) {
-                            return 3;
-                        }
-                        else if(patch.get('gamma') < 0.25) {
-                            return 4;
-                        }
-                        else if(patch.get('gamma') < 0.5) {
-                            return 5;
-                        }
-                        else if(patch.get('gamma') < 0.75) {
-                            return 6;
-                        }
-                        else {
-                            return 7;
-                        }
-                    }
-                    else {
-                        return 7;
-                    }
-                },
-                getStrokeOpacity : function(feature) {
-                    return 0.8;
-                },
-                getFillOpacity : function(feature) {
-                    return 1.0;
-                },
-                getLabel : function(feature) {
-                    if(map.getZoom() > 11 && feature.attributes.total_gamma)
-                    return feature.attributes.fqpatchid[0].toString();
-                    else
-                    return"";
-                },
-                getIcon : function(feature) {
-                    var patch = patchCollection.find(function(f) {
-                        return f.get('patchId') === feature.attributes.fqpatchid[0] &&
-                               f.get('zoneId') == feature.attributes.fqpatchid[1] &&
-                               f.get('hillId') == feature.attributes.fqpatchid[2]
-                    });
-                    if(patch) {
-                        if(patch.get('gamma') === 0) {
-                            return "square";
-                        }
-
-                        else {
-                            return "circle";
-                        }
-                    }
-                    else {
-                        return "circle";
-                    }
-                }
-            };
-            var style = new OpenLayers.Style(
-                {
-                    pointRadius : "${getPointRadius}",
-                    strokeColor : "${getStrokeColor}",
-                    strokeOpacity : "${getStrokeOpacity}",
-                    strokeWidth : "${getStrokeWidth}",
-                    fillColor : "${getFillColor}",
-                    fillOpacity : "${getFillOpacity}",
-                    graphicName : "${getIcon}",
-                    label : "${getLabel}",
-                    fontColor : "#000000",
-                    fontWeight: "bold",
-                    fontSize : "12px",
-                    fontFamily : "Helvetica, DejaVu Sans, Arial, sans-serif",
-                    labelAlign : "lm",
-                    labelXOffset: "${getPointRadius}",
-                    labelYOffset: 1,
-                    labelOutlineColor: "#ffffe0",
-                    labelOutlineWidth: 2,
-                    labelOutlineOpacity: 0.8
-                },
-                { context : styleContext }
-            );
-
-            var styleMap = new OpenLayers.StyleMap({default: style});
-
-
-
+            var styleMap = new OpenLayers.StyleMap({
+                pointRadius: 3,
+                fillOpacity: 0.3,
+                fillColor: "#FA9FB5",
+                strokeColor: "#C51B8A",
+                graphicName: 'square'
+            });
             var receivers = new OpenLayers.Layer.Vector('receivers', {styleMap : styleMap});
 
             var map = new OpenLayers.Map({ div:'map', projection: "EPSG:900913", layers: [
@@ -312,7 +182,6 @@
                 handlerOptions : { stopSingle: false },
                 infoFormat: 'application/json'
             });
-            var drawfeature = new OpenLayers.Control.DrawFeature(receivers, OpenLayers.Handler.Point);
 
 
             function showInfo(evt) {
@@ -321,28 +190,23 @@
                 var features = json.read(j);
                 patchCollection.reset([]);
 
-                var donorPatch = _.find(features, function(f) {return f.attributes.hasOwnProperty('total_gamma'); });
-                var rcv = _.filter(features, function(f) { return !f.attributes.hasOwnProperty('total_gamma'); });
-
-                _.each(rcv, function(f) {
+                _.each(features.slice(1, features.length), function(f) {
                     patchCollection.add({
                         fid : f.fid,
                         gamma: f.attributes.gamma ? f.attributes.gamma : null,
                         patchId: f.attributes.fqpatchid[0],
                         zoneId: f.attributes.fqpatchid[1],
                         hillId: f.attributes.fqpatchid[2],
-                        total_gamma: f.attributes.total_gamma ? f.attributes.total_gamma : null,
-                        feature: f
+                        total_gamma: f.attributes.total_gamma ? f.attributes.total_gamma : null
                     })
                 });
 
                 donor = new Patch({
-                        fid: donorPatch.fid,
-                        patchId: donorPatch.attributes.fqpatchid[0],
-                        zoneId: donorPatch.attributes.fqpatchid[1],
-                        hillId: donorPatch.attributes.fqpatchid[2],
-                        total_gamma: donorPatch.attributes.total_gamma,
-                        feature: donorPatch
+                        fid: features[0].fid,
+                        patchId: features[0].attributes.fqpatchid[0],
+                        zoneId: features[0].attributes.fqpatchid[1],
+                        hillId: features[0].attributes.fqpatchid[2],
+                        total_gamma: features[0].attributes.total_gamma
                 });
                 new DonorView({model:donor, el:"#donor"}).render();
 
@@ -355,31 +219,11 @@
                 return true;
             }
 
-            function onDraw(evt) {
-                var patch = {};
-
-                $.ajax({
-                    url:'/rhessysweb/get_patch',
-                    async:false,
-                    data: {
-                        x: evt.feature.geometry.x,
-                        y: evt.feature.geometry.y,
-                        srs: "EPSG:900913",
-                        slug: "taehee-test-rhessys-database/taehee-test-data"
-                    },
-                    success: function(data) {
-                        data.feature = evt.feature;
-                        patchCollection.add(data); }
-                });
-
-            }
-
 
             featureinfo.events.register("getfeatureinfo", null, showInfo);
-            drawfeature.events.register('featureadded', null, onDraw);
             map.addControl(featureinfo);
-            map.addControl(drawfeature);
             map.addControl(new OpenLayers.Control.MousePosition());
+            featureinfo.activate();
         });
     </script>
 {% endblock %}
