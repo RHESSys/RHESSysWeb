@@ -5,9 +5,16 @@ from django.contrib.gis.geos import Polygon
 import importlib
 import os
 import sh
+import redis
+import cPickle
 
 import tempfile
 from RHESSysWeb.grassdatalookup import GrassDataLookup
+from RHESSysWeb import flowtableio
+from RHESSysWeb.rhessystypes import FQPatchID
+from RHESSysWeb.flowtableio import FlowTableEntryReceiver
+
+flowtable = redis.Redis(db=15)
 
 class Grass(drivers.Driver):
     def __init__(self, resource):
@@ -66,7 +73,7 @@ class Grass(drivers.Driver):
 
         return self._region
 
-    def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
+    def get_real_srs(self, srs):
         r_srs = osr.SpatialReference()
 
         if isinstance(srs, basestring):
@@ -77,6 +84,10 @@ class Grass(drivers.Driver):
                 r_srs.ImportFromProj4(srs)
         else:
             r_srs.ImportFromEPSG(srs)
+
+
+    def get_fqpatch(self, srs, wherex, wherey):
+        r_srs = self.get_real_srs(srs)
 
         crx = osr.CoordinateTransformation(r_srs, self.proj)
 
@@ -108,20 +119,32 @@ class Grass(drivers.Driver):
             "{easting},{northing}".format(easting=easting, northing=northing)
         }).strip().split('|')
 
-        from RHESSysWeb import flowtableio, rhessystypes
-
         patch = int(patch)
         hillslope = int(hillslope)
         zone = int(zone)
 
-        fqpatch_id = rhessystypes.FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
+        return patch, hillslope, zone
 
-        if not hasattr(self, 'flow_table'):
-            self.flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+    def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
+        patch, hillslope, zone = self.get_fqpatch(srs, wherex, wherey)
+        fqpatch_id = FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
+        r_srs = self.get_real_srs(srs)
 
-        total_gamma = flowtableio.getEntryForFlowtableKey(fqpatch_id, self.flow_table).totalGamma
+        # setup redis if necessary
+        if not flowtable.llen(self.env.flow_table.name):
+            flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+            for fqpatchid, entry in flow_table.items():
+                key = cPickle.dumps(fqpatchid)
+                value = flowtableio.dumpReceivers(entry)
+                flowtable.rpush(self.env.flow_table.name, key)
+                flowtable.hset(self.env.flow_table.name + ".hash", key, value)
 
-        receivers = [fqpatch_id] + flowtableio.getReceiversForFlowtableEntry(fqpatch_id, self.flow_table)
+        # total_gamma = flowtableio.getEntryForFlowtableKey(fqpatch_id, self.flow_table).totalGamma
+        hkey = cPickle.dumps(fqpatch_id)
+        flowtable_entry = flowtableio.loadReceivers(flowtable.hget(self.env.flow_table.name + ".hash", hkey))
+        total_gamma = flowtable_entry[0].totalGamma
+
+        receivers = [fqpatch_id] + flowtable_entry[1:]
 
         coords = self._grassdatalookup.getCoordinatesForFQPatchIDs(
             receivers,
@@ -158,7 +181,6 @@ class Grass(drivers.Driver):
                     c[-1]['properties']['total_gamma'] = total_gamma
 
 
-        print len(c), len(coords), len(receivers), coords.keys()
         
         return {
             "type" : "FeatureCollection",
@@ -196,6 +218,7 @@ class Grass(drivers.Driver):
         self.resource.spatial_metadata.save()
 
     def ready_data_resource(self, **kwargs):
+        print "ready data resource"
         r = self.region
         s_srs =  self.proj
 
@@ -213,7 +236,7 @@ class Grass(drivers.Driver):
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
         if not os.path.exists(cached_tiff):
-            self.g.run_command('r.out.gdal', nodata='0', input=raster, output=cached_basename + ".native.tif")
+            self.g.run_command('r.out.tiff', flags='p', input=raster, output=cached_basename + ".native.tif")
             with open(cached_basename+'.native.prj', 'w') as prj:
                 prj.write(s_srs.ExportToWkt())
 

@@ -4,6 +4,7 @@
 
 {% block main %}{{ block.super }}
     <div id="map" style='width: 100%; height:600px;'></div>
+    <div id='help'></div>
 {% endblock %}
 
 
@@ -24,17 +25,7 @@
 
     </tbody>
     <tfoot>
-    <tr>
-        <td></td>
-        <td>
-            <button class="btn btn-block btn-success" id="save-flowtable">Commit</button>
-        </td>
-        <td>
-            <button class="btn btn-block btn-danger" id="revert-flowtable">Revert</button>
-        </td>
-        <td colspan="2">
-            <button class="btn btn-block btn-primary" id="add-receiver">Add Patch</button>
-        </td>
+    <tr id='control-panel' >
     </tr>
     </tfoot>
     </table>
@@ -62,7 +53,7 @@
         <td><%= patchId %></td>
         <td><%= zoneId %></td>
         <td><%= hillId %></td>
-        <td><input type="text" class='gamma' size="4" value="<%= gamma %>" /></td>
+        <td><input type="text" class='gamma' size="4" value="<%= gamma ? gamma : '0' %>" /></td>
     </script>
 
     <script id="donor-template" type="text/template">
@@ -70,6 +61,19 @@
         : Zone <%= zoneId %>
         : Hill <%= hillId %>
         : Total Flow <%= total_gamma %>
+    </script>
+
+    <script id='controls' type='text/template'>
+        <td></td>
+        <td>
+            <button class="btn btn-block btn-success" id="save-flowtable">Commit</button>
+        </td>
+        <td>
+            <button class="btn btn-block btn-danger" id="revert-flowtable">Revert</button>
+        </td>
+        <td colspan="2">
+            <button class="btn btn-block btn-primary" id="add-receiver">Add Receiver</button>
+        </td>
     </script>
 
 
@@ -83,20 +87,19 @@
             var PatchCollection = Backbone.Collection.extend({model:Patch});
             var patchCollection = new PatchCollection();
 
-            // val gammaSum = patchCollection.reduce(function(memo, patch) { memo += patch.get('gamma') }, 0);
-            //
-            // if(gammaSum != 1.0) {
-            //      $("#validation-alert").alert()
-            // }
-            // else {
-            //      $("#validation-alert").alert('close')
-            // }
-            //
-
-
             var SidebarPatchView = Backbone.Marionette.ItemView.extend({
                 template: "#sidebar-patch-template",
-                tagName: "tr"
+                tagName: "tr", 
+                ui: {
+                   gamma : ".gamma"
+                },
+                onRender: function() {
+                   var me = this;
+                   this.ui.gamma.change(function() { 
+                      console.log('gamma changed');
+                      this.model.set('gamma', parseFloat(me.ui.gamma.val()));
+                   });
+                }
             });
 
             var donor = new Patch({});
@@ -104,6 +107,31 @@
                 template: "#donor-template",
                 tagName: 'h6'
             });
+
+            var ControlPanelView = Backbone.Marionette.ItemView.extend({ 
+                el: "#control-panel",
+                template: "#controls",
+                ui: {
+                    commit : "#save-flowtable",
+                    revert : "#revert-flowtable",
+                    addReceiver : "#add-receiver"
+                },
+                onRender: function() {
+                    this.ui.commit.click(function() { 
+                        // make a call out to save all the receivers to the current patch id
+                        console.log('commit'); 
+                    });
+                    this.ui.revert.click(function() { 
+                        console.log('revert'); 
+                    });
+                    this.ui.addReceiver.click(function() { 
+                        console.log('add patch'); 
+                        $("#help").html("Click on the map and the patch you click on will be added to the set of receivers for this entry on the right.")
+                    });
+                }
+
+            });
+            var ctrlPanelView = new ControlPanelView().render();
 
 
             var SidebarView = Backbone.Marionette.CollectionView.extend({
@@ -175,7 +203,7 @@
                 });
 
                 donor = new Patch({
-                        fid: f.fid,
+                        fid: features[0].fid,
                         patchId: features[0].attributes.fqpatchid[0],
                         zoneId: features[0].attributes.fqpatchid[1],
                         hillId: features[0].attributes.fqpatchid[2],
@@ -192,7 +220,6 @@
                 return true;
             }
 
-//            receivers.addFeatures(new OpenLayers.Feature.Vector(new OpenLayers.Geometry.Point(-8543333, 4763295)));
 
             featureinfo.events.register("getfeatureinfo", null, showInfo);
             map.addControl(featureinfo);
