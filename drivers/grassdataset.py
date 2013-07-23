@@ -85,6 +85,8 @@ class Grass(drivers.Driver):
         else:
             r_srs.ImportFromEPSG(srs)
 
+        return r_srs
+
 
     def get_fqpatch(self, srs, wherex, wherey):
         r_srs = self.get_real_srs(srs)
@@ -92,12 +94,9 @@ class Grass(drivers.Driver):
         crx = osr.CoordinateTransformation(r_srs, self.proj)
 
         easting, northing, _ = crx.TransformPoint(wherex, wherey)
-        #dataset_name = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
-        #values = self.g.read_command("r.what", **{
-        #    "input" : dataset_name,
-        #    "null" : "None", "east_north" :
-        #    "{easting},{northing}".format(easting=easting, northing=northing)
-        #}).strip().split('|')
+
+        print crx
+        print easting, northing, srs
 
         ### everything below here is specific to rhessys and the hackathon ###
 
@@ -221,6 +220,8 @@ class Grass(drivers.Driver):
         print "ready data resource"
         r = self.region
         s_srs =  self.proj
+        print s_srs
+        print s_srs.ExportToProj4()
 
         e3857 = osr.SpatialReference()
         e3857.ImportFromEPSG(3857)
@@ -235,12 +236,37 @@ class Grass(drivers.Driver):
         raster = kwargs['RASTER'] if 'RASTER' in kwargs else self.env.default_raster
         cached_basename = os.path.join(self.cache_path, raster)
         cached_tiff = cached_basename + '.tif'
+        output = cached_basename + '.native.tif'
+        output_prj = cached_basename+ '.native.prj'
+
+        print cached_tiff
         if not os.path.exists(cached_tiff):
-            self.g.run_command('r.out.tiff', flags='p', input=raster, output=cached_basename + ".native.tif")
-            with open(cached_basename+'.native.prj', 'w') as prj:
+            print "generating tiff"
+            # Remove GRASS mask if present
+            self.g.run_command('r.mask', flags='r')
+
+            # TODO: Dynamically set name of mask layer 
+            # Mask layer must be 0|1 raster with 0 representing areas to 
+            #      exclude
+            mask = 'basin_dr5'
+            # TODO: Make export layer contain session ID, etc. to support multi
+            #       user
+            export = 'export'
+            if mask:
+                # Use mask to properly set alpha channel of exported TIFF
+                self.g.write_command('r.mapcalc', stdin="{export}=if({mask},{raster},{mask})".format(export=export, mask=mask, raster=raster) )
+                self.g.run_command('r.out.gdal', flags='f', type='UInt16', input=export, output=output)
+            else:
+                self.g.run_command('r.out.gdal', flags='f', type='UInt16', input=raster, output=output)
+                
+            with open(output_prj, 'w') as prj:
                 prj.write(s_srs.ExportToWkt())
 
-            sh.gdalwarp("-s_srs", cached_basename + '.native.prj', "-t_srs", "EPSG:3857", cached_basename + '.native.tif', cached_tiff)
+            sh.gdalwarp("-s_srs", output_prj, "-t_srs", "EPSG:3857", output, cached_tiff, '-srcnodata', '0', '-dstalpha')
+
+            if export:
+                # Clean up temporary export raster
+                self.g.run_command('g.remove', rast=export)
 
         return self.cache_path, (
             self.resource.slug,

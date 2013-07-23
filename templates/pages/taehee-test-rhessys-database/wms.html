@@ -71,8 +71,11 @@
         <td>
             <button class="btn btn-block btn-danger" id="revert-flowtable">Revert</button>
         </td>
-        <td colspan="2">
-            <button class="btn btn-block btn-primary" id="add-receiver">Add Receiver</button>
+        <td>
+            <button class="btn btn-block btn-primary" data-toggle='button' id="inspect-patch">Inspect patch</button>
+        </td>
+        <td>
+            <button class="btn btn-block btn-primary" data-toggle='button' id="add-receiver">Add Receiver</button>
         </td>
     </script>
 
@@ -97,7 +100,7 @@
                    var me = this;
                    this.ui.gamma.change(function() { 
                       console.log('gamma changed');
-                      this.model.set('gamma', parseFloat(me.ui.gamma.val()));
+                      me.model.set('gamma', parseFloat(me.ui.gamma.val()));
                    });
                 }
             });
@@ -114,6 +117,7 @@
                 ui: {
                     commit : "#save-flowtable",
                     revert : "#revert-flowtable",
+                    inspectPatch : "#inspect-patch",
                     addReceiver : "#add-receiver"
                 },
                 onRender: function() {
@@ -124,9 +128,17 @@
                     this.ui.revert.click(function() { 
                         console.log('revert'); 
                     });
-                    this.ui.addReceiver.click(function() { 
+                    this.ui.inspectPatch.click(function() {
+                       console.log('inspectPatch');
+                        featureinfo.activate();
+                        drawfeature.deactivate();
+                        $("help").html('Click on the map to select a patch and see its receivers');
+                    });
+                    this.ui.addReceiver.click(function() {
+                        featureinfo.deactivate();
+                        drawfeature.activate();
                         console.log('add patch'); 
-                        $("#help").html("Click on the map and the patch you click on will be added to the set of receivers for this entry on the right.")
+                        $("#help").html("Click on the map and the patch you click on will be added to the set of receivers for this entry on the right.");
                     });
                 }
 
@@ -183,6 +195,7 @@
                 handlerOptions : { stopSingle: false },
                 infoFormat: 'application/json'
             });
+            var drawfeature = new OpenLayers.Control.DrawFeature(receivers, OpenLayers.Handler.Point);
 
 
             function showInfo(evt) {
@@ -220,11 +233,29 @@
                 return true;
             }
 
+            function onDraw(evt) {
+                var patch = {};
+
+                $.ajax({
+                    url:'/rhessysweb/get_patch',
+                    async:false,
+                    data: {
+                        x: evt.feature.geometry.x,
+                        y: evt.feature.geometry.y,
+                        srs: "EPSG:900913",
+                        slug: "taehee-test-rhessys-database/taehee-test-data"
+                    },
+                    success: function(data) { patchCollection.add(data); }
+                });
+
+            }
+
 
             featureinfo.events.register("getfeatureinfo", null, showInfo);
+            drawfeature.events.register('featureadded', null, onDraw);
             map.addControl(featureinfo);
+            map.addControl(drawfeature);
             map.addControl(new OpenLayers.Control.MousePosition());
-            featureinfo.activate();
         });
     </script>
 {% endblock %}

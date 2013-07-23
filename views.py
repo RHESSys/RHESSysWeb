@@ -53,4 +53,4 @@ def get_patch(request, *args, **kwargs):
     from_table = request.GET['slug']
     p = Page.objects.get(slug=from_table)
     patch, hillslope, zone = p.dataresource.driver_instance.get_fqpatch(srs, wherex, wherey)
-    return HttpResponse(json.dumps(dict(patchID=patch, hillID=hillslope, zoneID=zone)), mimetype='application/json')
+    return HttpResponse(json.dumps(dict(patchId=patch, hillId=hillslope, zoneId=zone)), mimetype='application/json')
