@@ -1,19 +1,27 @@
 from ga_resources import drivers, models
-from uuid import uuid4
 from osgeo import gdal, ogr, osr
 from django.conf import settings
 from django.contrib.gis.geos import Polygon
 import importlib
 import os
 import sh
+import redis
+import cPickle
 
 import tempfile
+from RHESSysWeb.grassdatalookup import GrassDataLookup
+from RHESSysWeb import flowtableio
+from RHESSysWeb.rhessystypes import FQPatchID
+from RHESSysWeb.flowtableio import FlowTableEntryReceiver
 
-class Grass(drivers.Driver):
+flowtable = redis.Redis(db=15)
+
+class FlowtableDriver(drivers.Driver):
     def __init__(self, resource):
-        super(Grass, self).__init__(data_resource=resource)
+        super(FlowtableDriver, self).__init__(data_resource=resource)
         self.env = self.resource.parent.grassenvironment
         self.ensure_grass()
+        self._grassdatalookup = GrassDataLookup(self.g, self.grass_lowlevel)
 
     def ensure_grass(self):
         if 'GISRC' not in os.environ:
@@ -80,13 +88,69 @@ class Grass(drivers.Driver):
         return r_srs
 
 
-    def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
+    def get_fqpatch(self, srs, wherex, wherey):
         r_srs = self.get_real_srs(srs)
-        xrc = osr.CoordinateTransformation(self.proj, r_srs)
+
         crx = osr.CoordinateTransformation(r_srs, self.proj)
-        self.ensure_grass()
 
         easting, northing, _ = crx.TransformPoint(wherex, wherey)
+
+        print crx
+        print easting, northing, srs
+
+        ### everything below here is specific to rhessys and the hackathon ###
+
+        _, _, _, patch = self.g.read_command("r.what", **{
+            "input" : 'patch_5m',
+            "null" : "None", "east_north" :
+            "{easting},{northing}".format(easting=easting, northing=northing)
+        }).strip().split('|')
+
+        _, _, _, hillslope = self.g.read_command("r.what", **{
+            "input" : 'hillslope',
+            "null" : "None", "east_north" :
+            "{easting},{northing}".format(easting=easting, northing=northing)
+        }).strip().split('|')
+
+        _, _, _, zone = self.g.read_command("r.what", **{
+            "input" : 'hillslope',
+            "null" : "None", "east_north" :
+            "{easting},{northing}".format(easting=easting, northing=northing)
+        }).strip().split('|')
+
+        patch = int(patch)
+        hillslope = int(hillslope)
+        zone = int(zone)
+
+        return patch, hillslope, zone
+
+    def get_data_for_point(self, wherex, wherey, srs, fuzziness=0, **kwargs):
+        patch, hillslope, zone = self.get_fqpatch(srs, wherex, wherey)
+        fqpatch_id = FQPatchID(patchID=patch, hillID=hillslope, zoneID=zone)
+        r_srs = self.get_real_srs(srs)
+
+        # setup redis if necessary
+        if not flowtable.llen(self.env.flow_table.name):
+            flow_table = flowtableio.readFlowtable(os.path.join(settings.MEDIA_ROOT, self.env.flow_table.name))
+            for fqpatchid, entry in flow_table.items():
+                key = cPickle.dumps(fqpatchid)
+                value = flowtableio.dumpReceivers(entry)
+                flowtable.rpush(self.env.flow_table.name, key)
+                flowtable.hset(self.env.flow_table.name + ".hash", key, value)
+
+        # total_gamma = flowtableio.getEntryForFlowtableKey(fqpatch_id, self.flow_table).totalGamma
+        hkey = cPickle.dumps(fqpatch_id)
+        flowtable_entry = flowtableio.loadReceivers(flowtable.hget(self.env.flow_table.name + ".hash", hkey))
+        total_gamma = flowtable_entry[0].totalGamma
+
+        receivers = [fqpatch_id] + flowtable_entry[1:]
+
+        coords = self._grassdatalookup.getCoordinatesForFQPatchIDs(
+            receivers,
+            'patch_5m','hillslope','hillslope')
+
+        xrc = osr.CoordinateTransformation(self.proj, r_srs)
+        self.ensure_grass()
 
         rasters = self.g.list_strings('rast')
         def best_type(k):
@@ -99,11 +163,25 @@ class Grass(drivers.Driver):
                     return k
 
         c = []
-        c.append(dict(zip(rasters, [
-            best_type(k) for k in self.g.read_command('r.what', input=rasters, east_north='{e},{n}'.format(e=easting, n=northing)).strip().split('|')
-        ])))
+        for i, (fqpatchid, pairs) in enumerate(coords.items()):
+            for a in pairs:
+                c.append({
+                      "type" : "Feature",
+                      "geometry" : { "type" : "Point", "coordinates" : xrc.TransformPoint(a.easting, a.northing)[0:2] },
+                      "properties" : {
 
-        return c
+                          "patchId" : fqpatchid.patchID,
+                          'zoneId' : fqpatchid.zoneID,
+                          "hillId" : fqpatchid.hillID,
+                          "gamma" : receivers[i].gamma if hasattr(receivers[i], 'gamma') else None,
+                          "total_gamma" : None if hasattr(receivers[i], 'gamma') else total_gamma
+                      }
+                })
+
+        return {
+            "type" : "FeatureCollection",
+            "features" : c
+        }
 
     def get_metadata(self, **kwargs):
         return []
@@ -111,11 +189,11 @@ class Grass(drivers.Driver):
     def compute_fields(self, **kwargs):
 
         r = self.region
-        s_srs =  self.proj.ExportToProj4()
+        s_srs =  self.proj
 
         e4326 = osr.SpatialReference()
         e4326.ImportFromEPSG(4326)
-        crx = osr.CoordinateTransformation(self.proj, e4326)
+        crx = osr.CoordinateTransformation(s_srs, e4326)
 
         x0, y0, x1, y1 = r['w'], r['s'], r['e'], r['n']
         self.resource.spatial_metadata.native_srs = s_srs
@@ -150,20 +228,26 @@ class Grass(drivers.Driver):
         output = cached_basename + '.native.tif'
         output_prj = cached_basename+ '.native.prj'
 
-        # TODO change this to make more sense.
+        print cached_tiff
         if not os.path.exists(cached_tiff):
+            print "generating tiff"
             # Remove GRASS mask if present
             self.g.run_command('r.mask', flags='r')
 
-            mask = kwargs.get('mask', None)
-            export = uuid4().hex
+            # TODO: Dynamically set name of mask layer
+            # Mask layer must be 0|1 raster with 0 representing areas to
+            #      exclude
+            mask = 'basin_dr5'
+            # TODO: Make export layer contain session ID, etc. to support multi
+            #       user
+            export = 'export'
             if mask:
                 # Use mask to properly set alpha channel of exported TIFF
                 self.g.write_command('r.mapcalc', stdin="{export}=if({mask},{raster},{mask})".format(export=export, mask=mask, raster=raster) )
                 self.g.run_command('r.out.gdal', flags='f', type='UInt16', input=export, output=output)
             else:
                 self.g.run_command('r.out.gdal', flags='f', type='UInt16', input=raster, output=output)
-                
+
             with open(output_prj, 'w') as prj:
                 prj.write(s_srs.ExportToWkt())
 
@@ -182,4 +266,4 @@ class Grass(drivers.Driver):
             }
         )
 
-driver = Grass
+driver = FlowtableDriver
