@@ -102,7 +102,7 @@ class GrassDataLookup(object):
             objects representing the raster pixels that make up each patch in the input list 
             
         """
-        coords = OrderedDict()
+        coords = {}
         
         # Set up GRASS environment
         self.grass_lowlevel.G_gisinit('')
@@ -190,7 +190,11 @@ class GrassDataLookup(object):
 #        os.environ['GIS_LOCK'] = ''
 #        os.unlink(os.environ['GISRC'])
         
-        return coords
+        returnCoords = OrderedDict()
+        for fqPatchID in fqPatchIDs:
+            returnCoords[fqPatchID] = coords[fqPatchID]
+        
+        return returnCoords
     
     
     def _getCentroidCoordinatesForPatches(self, coordDict):
