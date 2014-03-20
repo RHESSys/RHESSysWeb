@@ -122,6 +122,7 @@ class TestReadFlowtable(TestCase):
         testKeyStr = "324225     67     67"
         values = testKeyStr.split()
         testEntry = rhessystypes.getFQPatchIDFromArray(values)
+        print unicode(testEntry)
         items = self.flowtable[testEntry] 
         self.assertTrue( len(items) == 9 )
         self.assertTrue( items[0].patchID == 324225 )
