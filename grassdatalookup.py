@@ -69,6 +69,20 @@ class GrassDataLookup(object):
         else:
             self.grass_lowlevel = grass_lib 
         
+    def exportRasterAsGeoTIFF(self, rasterName, outputPath, outputFilename):
+        """ @brief Export GRASS raster to GeoTIFF using GDAL
+        
+            @param rasterName String representing GRASS raster map to export
+            @param outputPath String representing absolute path of directory to which raster should be exported
+            @param outputFilename String representing name of file to which raster file should be exported
+                                  (this should include .tif/.tiff extension)
+        
+        """
+        # Pass filename separately incase we ever want to fiddle with it
+        outFilepath = os.path.join(outputPath, outputFilename)
+        self.g.run_command('g.region', rast='basin')
+        self.g.run_command('r.mask', flags='o', input='basin', maskcats=1)
+        self.g.run_command('r.out.gdal', type='Byte', intput=rasterName, output=outFilepath)
     
     def getSpatialReferenceForGRASSDataset(self):
         """ @brief Return the spatial reference for a GRASS mapset 
